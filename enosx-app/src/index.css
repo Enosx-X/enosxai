@@ -437,8 +437,8 @@
   /* ── Prose markdown styles for AI responses ── */
   .prose-crimson {
     color: #e8e8e8;
-    line-height: 1.65;
-    font-size: 14px;
+    line-height: 1.75;
+    font-size: 16px;
     max-width: 100%;
     overflow-wrap: anywhere;
     word-break: break-word;

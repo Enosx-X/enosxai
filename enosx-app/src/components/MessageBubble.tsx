@@ -139,7 +139,7 @@ function extractMediaFromText(text: string): ParsedMedia[] {
 
 function renderMarkdown(text: string, isStreaming = false) {
   return (
-    <Streamdown className="prose-crimson text-sm" mode={isStreaming ? "streaming" : "static"} isAnimating={isStreaming}>
+    <Streamdown className="prose-crimson" mode={isStreaming ? "streaming" : "static"} isAnimating={isStreaming}>
       {text}
     </Streamdown>
   );
@@ -344,7 +344,7 @@ export default function MessageBubble({
                     </div>
                   )}
                   <div
-                    className="text-sm leading-relaxed"
+                    className="text-base leading-relaxed"
                     style={{ color: config.text }}
                   >
                     {renderContentWithMedia(message.content, config.accent)}

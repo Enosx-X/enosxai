@@ -22,8 +22,6 @@ import {
   Library,
   Settings,
   Sparkles,
-  Bell,
-  BellRing,
 } from "lucide-react";
 import { Conversation } from "@/lib/types";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -46,8 +44,6 @@ interface SidebarProps {
   onLibraryClick?: () => void;
   onReusableFeatureClick?: () => void;
   onScreenGuiderClick?: () => void;
-  onNotificationsClick?: () => void;
-  notificationsEnabled?: boolean;
   isPro?: boolean;
   isMobileOpen?: boolean;
   onMobileClose?: () => void;
@@ -67,8 +63,6 @@ export default function Sidebar({
   onLibraryClick,
   onReusableFeatureClick,
   onScreenGuiderClick,
-  onNotificationsClick,
-  notificationsEnabled = false,
   isPro = false,
   isMobileOpen = false,
   onMobileClose,
@@ -117,14 +111,6 @@ export default function Sidebar({
       icon: Settings,
       onClick: onSettingsClick || (() => {}),
       accent: false,
-      danger: false,
-    },
-    {
-      label: notificationsEnabled ? "Notifications On" : "Notifications",
-      description: notificationsEnabled ? "System alerts + EX sound" : "Enable system-bar alerts",
-      icon: notificationsEnabled ? BellRing : Bell,
-      onClick: onNotificationsClick || (() => {}),
-      accent: notificationsEnabled,
       danger: false,
     },
     {
@@ -216,9 +202,9 @@ export default function Sidebar({
               {!collapsed && (
                 <div className="flex flex-col items-start overflow-hidden flex-1">
                   <div className="flex items-center justify-between w-full">
-                    <span className="text-sm font-semibold whitespace-nowrap">{item.label}</span>
+                    <span className="text-base font-semibold whitespace-nowrap">{item.label}</span>
                   </div>
-                  <span className="text-[10px] opacity-60 whitespace-nowrap">{item.description}</span>
+                  <span className="text-xs opacity-70 whitespace-nowrap">{item.description}</span>
                 </div>
               )}
             </motion.button>
@@ -313,7 +299,7 @@ export default function Sidebar({
           }
           {!collapsed && (
             <div className="flex flex-col items-start overflow-hidden">
-              <span className="text-sm font-semibold whitespace-nowrap" style={{ color: config.text }}>
+              <span className="text-base font-semibold whitespace-nowrap" style={{ color: config.text }}>
                 {isAuthenticated ? user?.displayName ?? 'Profile' : 'Sign In'}
               </span>
               <span className="text-[10px] whitespace-nowrap truncate max-w-[160px]" style={{ color: config.textMuted }}>

@@ -59,8 +59,8 @@ import { getSplitEnabled, setSplitEnabled, onSplitPrefChange, notifySplitPrefCha
 import { WORKSPACE_DIRECTIVES } from "@/lib/workspaceDirectives";
 import { useCommandChain, type SystemAction } from "@/hooks/useCommandChain";
 import { ComputerWorkspaceProvider, useComputerWorkspace } from "@/contexts/ComputerWorkspaceContext";
-import { ChevronDown, Copy, Download, Menu, Share2 } from "lucide-react";
-import { buildWhatsAppHandoff, copyTranscript, downloadTranscript } from "@/lib/shareConversation";
+import { ChevronDown, Copy, Menu, Share2 } from "lucide-react";
+import { copyTranscript } from "@/lib/shareConversation";
 import { useScriptRuntime, type ScriptLanguage } from "@/hooks/useScriptRuntime";
 import {
   getNotificationPermission,
@@ -478,17 +478,6 @@ export default function ChatPage() {
       toast.error("Notifications are blocked. Enable them in your browser site settings.");
     }
   }, []);
-  // Browsers require a user gesture for permission prompts. Ask automatically
-  // after the first interaction, while keeping the explicit control in the
-  // Sidebar menu for users who dismiss or revisit the prompt.
-  useEffect(() => {
-    if (notificationPermission !== "default" || typeof window === "undefined") return;
-    const enableAfterInteraction = () => {
-      void handleEnableNotifications();
-    };
-    window.addEventListener("pointerdown", enableAfterInteraction, { once: true });
-    return () => window.removeEventListener("pointerdown", enableAfterInteraction);
-  }, [notificationPermission, handleEnableNotifications]);
 
   const handleSend = useCallback(
     async (text: string, aiMode?: AIMode, selectedConnectorIds?: string[]): Promise<string> => {
@@ -937,15 +926,6 @@ ${getAdminContext()}` : ""}`,
     const copied = await copyTranscript(activeConversation);
     toast[copied ? "success" : "error"](copied ? "Conversation copied to your clipboard" : "Could not copy this conversation");
   }, [activeConversation]);
-  const handleDownloadConversation = useCallback((format: "txt" | "md") => {
-    if (!activeConversation || activeConversation.messages.length === 0) return;
-    downloadTranscript(activeConversation, format);
-    toast.success(`Conversation downloaded as ${format.toUpperCase()}`);
-  }, [activeConversation]);
-  const handleWhatsAppConversation = useCallback(() => {
-    if (!activeConversation || activeConversation.messages.length === 0) return;
-    window.open(buildWhatsAppHandoff(activeConversation), "_blank", "noopener,noreferrer");
-  }, [activeConversation]);
 
   // Keep workspace hooks unconditional: phone and TV layouts return early, so
   // every render must execute the same hooks in the same order.
@@ -1090,8 +1070,6 @@ ${getAdminContext()}` : ""}`,
           onProfileClick={() => setShowProfilePanel(true)}
           onLibraryClick={() => conversationSearch.open()}
           onScreenGuiderClick={toggleScreenGuider}
-          onNotificationsClick={() => void handleEnableNotifications()}
-          notificationsEnabled={notificationPermission === "granted"}
         />
       )}
 
@@ -1116,8 +1094,6 @@ ${getAdminContext()}` : ""}`,
           }}
           onLibraryClick={() => { setIsMobileSidebarOpen(false); conversationSearch.open(); }}
           onScreenGuiderClick={() => { setIsMobileSidebarOpen(false); toggleScreenGuider(); }}
-          onNotificationsClick={() => void handleEnableNotifications()}
-          notificationsEnabled={notificationPermission === "granted"}
         />
       )}
 
@@ -1134,7 +1110,7 @@ ${getAdminContext()}` : ""}`,
               </button>
             )}
             <div className="flex flex-col">
-              <h1 className="text-sm font-bold tracking-tight text-white/90">
+              <h1 className="text-base font-bold tracking-tight text-white/90">
                 {activeConversation?.title || "ENOSX AI"}
               </h1>
             </div>
@@ -1144,8 +1120,6 @@ ${getAdminContext()}` : ""}`,
             <div className="hidden items-center gap-1 sm:flex" aria-label="Conversation actions">
               <button type="button" onClick={() => void handleShareConversation()} disabled={!activeConversation?.messages.length} title="Share conversation" aria-label="Share conversation" className="rounded-full border border-white/10 p-2 text-white/65 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"><Share2 size={14} /></button>
               <button type="button" onClick={() => void handleCopyConversation()} disabled={!activeConversation?.messages.length} title="Copy conversation" aria-label="Copy conversation" className="rounded-full border border-white/10 p-2 text-white/65 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"><Copy size={14} /></button>
-              <button type="button" onClick={() => handleDownloadConversation("md")} disabled={!activeConversation?.messages.length} title="Download Markdown" aria-label="Download Markdown" className="rounded-full border border-white/10 p-2 text-white/65 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"><Download size={14} /></button>
-              <button type="button" onClick={handleWhatsAppConversation} disabled={!activeConversation?.messages.length} title="Hand off to WhatsApp support" aria-label="Hand off to WhatsApp support" className="rounded-full border border-emerald-300/20 p-2 text-emerald-200/75 transition hover:bg-emerald-300/10 disabled:cursor-not-allowed disabled:opacity-30"><span className="text-[11px] font-bold">WA</span></button>
             </div>
             {screenGuiderActive && (
               <motion.div 
@@ -1351,6 +1325,8 @@ ${getAdminContext()}` : ""}`,
             onClose={() => setShowProfilePanel(false)}
             onOpenAdminConsole={() => setShowAdminConsole(true)}
             onOpenLeadCapture={() => setShowLeadCapture(true)}
+            onEnableNotifications={handleEnableNotifications}
+            notificationPermission={notificationPermission}
           />
         )}
       </AnimatePresence>

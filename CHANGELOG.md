@@ -1,3 +1,10 @@
+## v0.1.15 — Readability & Settings refinements
+
+- Increased chat response and user-message typography for easier reading.
+- Updated ENOSX AI guidance to use helpful emoji/icons, Markdown tables, and compact text diagrams when they improve clarity.
+- Set the default wallpaper to None (existing saved selections remain unchanged).
+- Removed Download and WA from the chat header and moved browser notification permission controls from the sidebar into Settings.
+
 # Changelog
 
 ## 0.1.9 — 2026-10-07

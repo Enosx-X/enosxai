@@ -34,6 +34,8 @@ interface ProfilePanelProps {
   onClose: () => void;
   onOpenAdminConsole?: () => void;
   onOpenLeadCapture?: () => void;
+  onEnableNotifications?: () => void | Promise<void>;
+  notificationPermission?: NotificationPermission | "unsupported";
 }
 
 type AuthMode = 'signin' | 'signup';
@@ -79,7 +81,7 @@ const FEATURED_WALLPAPERS = [
   },
 ];
 
-export default function ProfilePanel({ isOpen, onClose, onOpenAdminConsole, onOpenLeadCapture }: ProfilePanelProps) {
+export default function ProfilePanel({ isOpen, onClose, onOpenAdminConsole, onOpenLeadCapture, onEnableNotifications, notificationPermission = "default" }: ProfilePanelProps) {
   const { settings: speechSettings, updateSettings: updateSpeechSettings } = useVoice();
   const { play: playSound } = useSoundEffects();
   const { config, theme, setTheme } = useTheme();
@@ -575,7 +577,25 @@ export default function ProfilePanel({ isOpen, onClose, onOpenAdminConsole, onOp
 	                    ))}
 	                  </div>
 
-	                  {/* Save */}
+	                  {/* System notification permission now lives in Settings, not the sidebar. */}
+                  <div className="flex items-center justify-between gap-3 px-3 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Bell size={16} style={{ color: accentColor, flexShrink: 0 }} />
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold" style={{ color: 'rgba(255,255,255,0.9)' }}>System notifications</div>
+                        <div className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                          {notificationPermission === 'granted' ? 'Enabled in this browser' : notificationPermission === 'denied' ? 'Allow notifications in browser site settings' : notificationPermission === 'unsupported' ? 'Not supported here' : 'Allow ENOSX alerts'}
+                        </div>
+                      </div>
+                    </div>
+                    {notificationPermission !== 'granted' && notificationPermission !== 'unsupported' && notificationPermission !== 'denied' && (
+                      <button type="button" onClick={() => void onEnableNotifications?.()} className="shrink-0 rounded-lg px-3 py-2 text-xs font-semibold" style={{ background: `rgba(${accentRgb},0.18)`, border: `1px solid rgba(${accentRgb},0.3)`, color: accentColor }}>
+                        Enable
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Save */}
                   <button onClick={handleSaveProfile} disabled={saveStatus === 'saving'}
                     className="w-full py-3 rounded-2xl text-sm font-bold transition-all flex items-center justify-center gap-2"
                     style={{ background: saveStatus === 'saved' ? 'rgba(34,197,94,0.2)' : saveStatus === 'error' ? 'rgba(220,20,60,0.2)' : `rgba(${accentRgb},0.18)`, border: saveStatus === 'saved' ? '1px solid rgba(34,197,94,0.4)' : saveStatus === 'error' ? '1px solid rgba(220,20,60,0.4)' : `1px solid rgba(${accentRgb},0.35)`, color: saveStatus === 'saved' ? '#4ade80' : saveStatus === 'error' ? '#ff6b8a' : accentColor }}>
