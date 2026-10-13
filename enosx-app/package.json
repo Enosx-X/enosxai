@@ -17,6 +17,7 @@
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
     "docx": "^9.8.1",
+    "firebase": "^13.0.0",
     "framer-motion": "catalog:",
     "lucide-react": "catalog:",
     "mammoth": "^1.13.0",

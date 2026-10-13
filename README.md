@@ -113,11 +113,26 @@ Version tags (`v*`) automatically trigger the desktop installer build workflow.
 
 ### Environment Variables
 
-**GitHub OAuth** (Required for sign-in):
-- `GITHUB_CLIENT_ID`
-- `GITHUB_CLIENT_SECRET`
-- `GITHUB_OAUTH_STATE_SECRET`
-- `GITHUB_OAUTH_REDIRECT_ORIGIN`
+**Firebase Auth & Firestore** (web account sign-in, profiles, and chat sync):
+- `VITE_FIREBASE_API_KEY`
+- `VITE_FIREBASE_AUTH_DOMAIN`
+- `VITE_FIREBASE_PROJECT_ID`
+- `VITE_FIREBASE_STORAGE_BUCKET`
+- `VITE_FIREBASE_MESSAGING_SENDER_ID`
+- `VITE_FIREBASE_APP_ID`
+
+These are Firebase Web App client settings, not service-account secrets. Configure them in the Vercel project environment and rebuild the frontend after setting them. Do not put a Firebase service-account key in any `VITE_` variable.
+
+#### Firebase setup
+
+1. Create/select a Firebase project and register a Web app in Firebase Console → **Project settings**.
+2. Enable **Email/Password** and **Google** under **Authentication → Sign-in method**. Add the production site and any preview/test hosts to **Authorized domains**.
+3. Create a Cloud Firestore database, then deploy this repository's rules: `firebase deploy --only firestore:rules` (requires Firebase CLI login and project selection).
+4. Add the six `VITE_FIREBASE_*` Web App settings above to the Vercel project's environment variables and redeploy.
+
+Authentication is handled by Firebase Auth; Firestore stores profiles under `users/{uid}` and chats/messages under that user's document tree. The checked-in `firestore.rules` limits reads and writes to the authenticated matching UID. Firebase Auth persists sign-in on the device/browser; the same Firebase account can be used on phone, tablet, or PC. Guest mode remains local to the device.
+
+Existing pre-Firebase chats are not automatically copied into a signed-in account: they may belong to another person who used the same device. Export or review them before any future account migration.
 
 **AI Services**:
 - `NVIDIA_API_KEY` — NVIDIA's OpenAI-compatible API for chat
@@ -143,7 +158,8 @@ Review the [Deployment & Security Guide](docs/DEPLOYMENT.md) for the complete ch
 ## 🔒 Security & Best Practices
 
 - ✅ Server-side credential management (all API keys encrypted)
-- ✅ GitHub OAuth for secure sign-in
+- ✅ Firebase Auth for email/password and Google sign-in
+- ✅ Firestore rules scope profile and chat data to the authenticated Firebase UID
 - ✅ Signed desktop releases via Tauri
 - ✅ No credentials in version control
 - ✅ Automatic desktop app updates with signature verification

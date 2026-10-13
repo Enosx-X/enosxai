@@ -58,6 +58,7 @@ import ChatSplitLayout from "@/components/ChatSplitLayout";
 import { getSplitEnabled, setSplitEnabled, onSplitPrefChange, notifySplitPrefChanged } from "@/lib/splitPref";
 import { WORKSPACE_DIRECTIVES } from "@/lib/workspaceDirectives";
 import { useCommandChain, type SystemAction } from "@/hooks/useCommandChain";
+import { deleteConversation as deleteCloudConversation, loadConversations, saveConversation } from "@/lib/firebaseStorage";
 import { ComputerWorkspaceProvider, useComputerWorkspace } from "@/contexts/ComputerWorkspaceContext";
 import { ChevronDown, Copy, Menu, Share2 } from "lucide-react";
 import { copyTranscript } from "@/lib/shareConversation";
@@ -250,8 +251,10 @@ function parseWorkspaceActions(text: string): SystemAction[] {
 
 export default function ChatPage() {
   const { config } = useTheme();
+  const { user, isAuthenticated, updateProfile } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>(() => {
-    const saved = localStorage.getItem("enosx_chats");
+    const owner = user?.provider === "guest" || !user ? "guest" : user.id;
+    const saved = localStorage.getItem(`enosx_chats_${owner}`) || (owner === "guest" ? localStorage.getItem("enosx_chats") : null);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -262,70 +265,84 @@ export default function ChatPage() {
     }
     return [];
   });
+  const [readyOwner, setReadyOwner] = useState<string>(user?.provider === "guest" || !user ? "guest" : user.id);
   const [activeId, setActiveId] = useState<string | null>(() => {
-    return localStorage.getItem("enosx_active_chat");
+    const owner = user?.provider === "guest" || !user ? "guest" : user.id;
+    return localStorage.getItem(`enosx_active_chat_${owner}`) || (owner === "guest" ? localStorage.getItem("enosx_active_chat") : null);
   });
   const [activeMode, setActiveMode] = useState<AIMode>("ex-core");
-  const { user, isAuthenticated, updateProfile } = useAuth();
 
-  // Persist conversations to localStorage and Neon
+  // Keep local data account-scoped. A device's guest/local conversations are
+  // never automatically copied into another signed-in account.
   useEffect(() => {
-    localStorage.setItem("enosx_chats", JSON.stringify(conversations));
+    const owner = user?.provider === "guest" || !user ? "guest" : user.id;
+    setReadyOwner("");
+    const saved = localStorage.getItem(`enosx_chats_${owner}`);
+    let local: Conversation[] = [];
+    if (saved) {
+      try { local = (JSON.parse(saved) as unknown[]).map(normalizeConversation).filter(Boolean) as Conversation[]; }
+      catch (error) { console.error("Failed to load account-scoped chats:", error); }
+    } else if (owner === "guest") {
+      try { local = (JSON.parse(localStorage.getItem("enosx_chats") || "[]") as unknown[]).map(normalizeConversation).filter(Boolean) as Conversation[]; }
+      catch { local = []; }
+    }
+    setConversations(local);
+    setActiveId(localStorage.getItem(`enosx_active_chat_${owner}`) || (owner === "guest" ? localStorage.getItem("enosx_active_chat") : null));
+
+    if (!isAuthenticated || !user || user.provider === "guest") {
+      setReadyOwner(owner);
+      return;
+    }
+    let cancelled = false;
+    void loadConversations(user.id).then((remote) => {
+      if (cancelled) return;
+      const byId = new Map(remote.map((conversation) => [conversation.id, conversation]));
+      local.forEach((conversation) => byId.set(conversation.id, conversation));
+      setConversations(Array.from(byId.values()).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()));
+      setReadyOwner(owner);
+    }).catch((error) => {
+      console.error("Failed to load chats from Firestore:", error);
+      setReadyOwner(owner);
+    });
+    return () => { cancelled = true; };
+  }, [isAuthenticated, user?.id, user?.provider]);
+
+  // Persist locally and sync signed-in accounts to Firestore.
+  useEffect(() => {
+    const owner = user?.provider === "guest" || !user ? "guest" : user.id;
+    if (readyOwner !== owner) return;
+    localStorage.setItem(`enosx_chats_${owner}`, JSON.stringify(conversations));
+    if (owner === "guest") localStorage.setItem("enosx_chats", JSON.stringify(conversations));
 
     // Streamed replies update this state many times per second. Wait until the
     // response settles before syncing, otherwise every token can start another
     // full conversation write and compete with the AI request.
-    if (!isAuthenticated || !user?.id) return;
+    if (!isAuthenticated || !user?.id || user.provider === "guest") return;
     const syncTimer = window.setTimeout(() => {
       void (async () => {
         try {
-          await Promise.all(conversations.map((conv) => fetch('/api/history', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: user.id, chat: conv }),
-          })));
+          await Promise.all(conversations.map((conversation) => saveConversation(user.id, conversation)));
         } catch (err) {
-          console.error("Failed to sync history to Neon:", err);
+          console.error("Failed to sync history to Firestore:", err);
         }
       })();
     }, 800);
 
     return () => window.clearTimeout(syncTimer);
-  }, [conversations, isAuthenticated, user?.id]);
-
-  // Load history from Neon on mount if authenticated
-  useEffect(() => {
-    if (isAuthenticated && user?.id) {
-      const loadHistory = async () => {
-        try {
-          const res = await fetch(`/api/history?userId=${user.id}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data.history && data.history.length > 0) {
-              const remote = data.history.map(normalizeConversation).filter(Boolean) as Conversation[];
-              setConversations((local) => {
-                const byId = new Map(local.map((conversation) => [conversation.id, conversation]));
-                remote.forEach((conversation) => byId.set(conversation.id, conversation));
-                return Array.from(byId.values()).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
-              });
-            }
-          }
-        } catch (err) {
-          console.error("Failed to load history from Neon:", err);
-        }
-      };
-      loadHistory();
-    }
-  }, [isAuthenticated, user?.id]);
+  }, [conversations, isAuthenticated, user?.id, user?.provider, readyOwner]);
 
   // Persist activeId to localStorage
   useEffect(() => {
+    const owner = user?.provider === "guest" || !user ? "guest" : user.id;
+    if (readyOwner !== owner) return;
     if (activeId) {
-      localStorage.setItem("enosx_active_chat", activeId);
+      localStorage.setItem(`enosx_active_chat_${owner}`, activeId);
+      if (owner === "guest") localStorage.setItem("enosx_active_chat", activeId);
     } else {
-      localStorage.removeItem("enosx_active_chat");
+      localStorage.removeItem(`enosx_active_chat_${owner}`);
+      if (owner === "guest") localStorage.removeItem("enosx_active_chat");
     }
-  }, [activeId]);
+  }, [activeId, user?.id, user?.provider, readyOwner]);
 
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [autoSpeak, setAutoSpeak] = useState(false);
@@ -877,8 +894,11 @@ ${getAdminContext()}` : ""}`,
 
   const deleteConversation = useCallback((id: string) => {
     setConversations((prev) => prev.filter((c) => c.id !== id));
+    if (user && user.provider !== "guest") {
+      void deleteCloudConversation(user.id, id).catch((error) => console.error("Failed to delete chat from Firestore:", error));
+    }
     if (activeId === id) setActiveId(null);
-  }, [activeId]);
+  }, [activeId, user]);
 
   const handleStartVoice = (event?: React.MouseEvent) => {
     playSound("click");
