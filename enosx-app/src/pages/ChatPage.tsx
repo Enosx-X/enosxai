@@ -647,11 +647,15 @@ export default function ChatPage() {
       const leadershipInfo = identity.leadership.map(l => `- ${l.name}: ${l.role} (${l.specialty})`).join('\n');
       const companyFacts = identity.companyFacts.map(fact => `- ${fact}`).join('\n');
       const companyFaqs = identity.companyFaqs.map(faq => `- Q: ${faq.question}\n  A: ${faq.answer}`).join('\n');
+      const userPersonalization = user
+        ? `### Signed-in user context\n- Name: ${user.displayName || "Not provided"}\n- Email: ${user.email || "Not provided"}\n- Preferred language: ${user.language || "Not specified"}\n- AI personality preference: ${user.aiPersonality || "Not specified"}\n- Theme preference: ${user.theme || "Not specified"}\n\nUse this profile and personalization context to make relevant answers more helpful. Address the user by name naturally when appropriate, respect their language and personality preferences, and use their email only when directly relevant. Do not unnecessarily repeat or expose personal details.`
+        : "### User context\nThe user is not signed in; do not assume personal profile details.";
       
             const systemPrompt: Message = {
         id: "system-identity",
         role: "system",
         content: `${getSystemPrompt(activeMode)}
+${userPersonalization}
 
 ### Enosx Technologies - Verified Information
 Founder & CEO: ${identity.founder}
@@ -823,6 +827,15 @@ ${getAdminContext()}` : ""}`,
                 : conversation,
             ),
           );
+          const notificationReply = cleanContent.replace(/\s+/g, " ").trim();
+          if (notificationReply) {
+            sendEnosxNotification({
+              title: user?.displayName ? `ENOSX AI · ${user.displayName}` : "ENOSX AI",
+              body: notificationReply.slice(0, 240),
+              tag: `enosx-reply-${assistantId}`,
+              data: { url: window.location.href, conversationId: targetConvId, messageId: assistantId },
+            });
+          }
           if (autoSpeak) {
             speak(cleanContent);
             if (speechSettings.continuousConversation) {
@@ -843,7 +856,7 @@ ${getAdminContext()}` : ""}`,
         sendingRef.current = false;
       }
     },
-    [sendMessage, speak, autoSpeak, fileContext.isLoaded, getFileContextMessage, getMemoryContext, getSkillContext, getKnowledgeContext, addMemory, addEntry, enrichMessageWithContext, activeWindow, clearFiles, parseActions, speechSettings.continuousConversation, scheduleListenAgain, createScript, updateScript, deleteScript]
+    [sendMessage, speak, autoSpeak, user, fileContext.isLoaded, getFileContextMessage, getMemoryContext, getSkillContext, getKnowledgeContext, addMemory, addEntry, enrichMessageWithContext, activeWindow, clearFiles, parseActions, speechSettings.continuousConversation, scheduleListenAgain, createScript, updateScript, deleteScript]
   );
 
   const createNewChat = useCallback(() => {
