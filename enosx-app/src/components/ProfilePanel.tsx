@@ -26,6 +26,7 @@ import BrandMark from './BrandMark';
 import { useVoice } from '../hooks/useVoice';
 import { useSoundEffects } from '../hooks/useSoundEffects';
 import LocalModelsPanel from './LocalModelsPanel';
+import { ENOSX_LANGUAGES } from '../lib/languageDictionary';
 
 type View = 'auth' | 'profile' | 'preferences' | 'appearance' | 'privacy' | 'voice' | 'models';
 
@@ -47,11 +48,7 @@ const PERSONALITIES = [
   { id: 'casual', label: 'Casual', icon: '😊', desc: 'Friendly, relaxed, conversational' },
 ];
 
-const LANGUAGES = [
-  'English', 'Spanish', 'French', 'German', 'Japanese',
-  'Chinese', 'Arabic', 'Portuguese', 'Russian', 'Korean',
-  'Italian', 'Hindi',
-];
+const LANGUAGES = ENOSX_LANGUAGES;
 
 // 4 featured wallpapers for quick selection
 const FEATURED_WALLPAPERS = [
