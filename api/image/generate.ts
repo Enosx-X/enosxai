@@ -29,6 +29,7 @@ import sharp from "sharp";
 const DEFAULT_PROMPT = "Create a polished image based on the supplied prompt.";
 const DEFAULT_WIDTH = 512;
 const DEFAULT_HEIGHT = 512;
+const DEFAULT_DIFFUSION_STEPS = 20;
 const MAX_PROMPT_LENGTH = 800;
 const MAX_IMAGE_LENGTH = 8_000_000;
 const NVIDIA_HOSTED_FLUX2_ENDPOINT = "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.2-klein-4b";
@@ -201,7 +202,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ? {
         prompt,
         aspect_ratio: imagePayload ? "match_input_image" : "1:1",
-        steps: asBoundedNumber(body.steps, 30, 1, 100),
+        steps: asBoundedNumber(body.steps, DEFAULT_DIFFUSION_STEPS, 1, 100),
         cfg_scale: asBoundedNumber(body.cfg_scale, 3.5, 0, 20),
         ...(imagePayload ? { image: imagePayload } : {}),
         ...(body.seed !== undefined ? { seed: asBoundedNumber(body.seed, 0, 0, 2_147_483_647) } : {}),
@@ -213,7 +214,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         n: 1,
         response_format: "b64_json",
         cfg_scale: asBoundedNumber(body.cfg_scale, 4, 1.01, 20),
-        steps: asBoundedNumber(body.steps, 30, 5, 100),
+        steps: asBoundedNumber(body.steps, DEFAULT_DIFFUSION_STEPS, 5, 100),
       }
     : {
         prompt,
@@ -221,7 +222,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         width: asBoundedNumber(body.width, DEFAULT_WIDTH, 64, 2048),
         height: asBoundedNumber(body.height, DEFAULT_HEIGHT, 64, 2048),
         cfg_scale: asBoundedNumber(body.cfg_scale, 7, 0, 20),
-        steps: asBoundedNumber(body.steps, 30, 1, 150),
+        steps: asBoundedNumber(body.steps, DEFAULT_DIFFUSION_STEPS, 1, 150),
       };
   if (usesOpenAiImageApi && (body.width !== undefined || body.height !== undefined)) {
     const width = asBoundedNumber(body.width, DEFAULT_WIDTH, 512, 1664);
@@ -263,7 +264,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             image: imagePayload,
             model,
             cfg_scale: asBoundedNumber(body.cfg_scale, 4, 1.01, 20),
-            steps: asBoundedNumber(body.steps, 30, 5, 100),
+            steps: asBoundedNumber(body.steps, DEFAULT_DIFFUSION_STEPS, 5, 100),
             response_format: "b64_json",
             n: 1,
             size: `${asBoundedNumber(body.width, DEFAULT_WIDTH, 64, 2048)}x${asBoundedNumber(body.height, DEFAULT_HEIGHT, 64, 2048)}`,

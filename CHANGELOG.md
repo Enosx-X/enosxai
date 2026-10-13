@@ -1,3 +1,12 @@
+## v0.1.19 — Chat stability, GOD MODE separation & faster generation
+
+- Kept streamed chat scrolling inside its own pane and prevented long replies from shifting the surrounding desktop window.
+- Moved GOD MODE command conversations into a separate, clearly labeled chat and restored the prior regular chat when GOD MODE closes.
+- Updated GOD MODE history and terminal iconography with a distinct crown marker and highlight.
+- Reduced retained chat history sent to the model from 28 to 20 messages to cut repeated prompt-processing work in long conversations.
+- Lowered the default diffusion step count on slower image/edit paths from 30 to 20, while keeping explicit step overrides available.
+- Added an immediate in-chat image-generation indicator and mark it complete when the result or error arrives.
+
 ## v0.1.17 — Adaptive Composer
 
 - Narrowed the message composer for a more focused chat layout while retaining responsive mobile sizing.

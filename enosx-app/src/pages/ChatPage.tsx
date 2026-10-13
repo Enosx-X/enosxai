@@ -354,8 +354,10 @@ export default function ChatPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
   const activeIdRef = useRef<string | null>(null);
   const conversationsRef = useRef<Conversation[]>([]);
+  const godModeReturnConversationIdRef = useRef<string | null>(null);
   // Prevent double submission (e.g. rapid Enter presses) from adding the same
   // prompt twice to the conversation.
   const sendingRef = useRef(false);
@@ -470,6 +472,13 @@ export default function ChatPage() {
   const acknowledgeGodModeWarning = useCallback(() => {
     setShowGodModeWarning(false);
     setIsGodModeActive(true);
+    godModeReturnConversationIdRef.current = activeIdRef.current;
+    const godConversation = createConversation();
+    godConversation.title = `GOD MODE — ${new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`;
+    setConversations((prev) => [godConversation, ...prev]);
+    activeIdRef.current = godConversation.id;
+    setActiveId(godConversation.id);
+    shouldAutoScrollRef.current = true;
     toast.success("Authorized lab mode confirmed — GOD MODE initializing");
   }, []);
 
@@ -565,8 +574,9 @@ export default function ChatPage() {
       const assistantMessage: Message = {
         id: assistantId,
         role: "assistant",
-        content: "",
+        content: shouldGenerateImage ? "🖼️ Generating your image..." : "",
         timestamp: new Date(),
+        isStreaming: shouldGenerateImage,
       };
 
       // ── Image generation mode ────────────────────────────────────────────────
@@ -597,8 +607,9 @@ export default function ChatPage() {
                 ? {
                     ...c,
                     messages: c.messages.map((m) =>
-                      m.id === assistantId ? { ...m, content: imageMarkdown } : m
+                      m.id === assistantId ? { ...m, content: imageMarkdown, isStreaming: false } : m
                     ),
+                    updatedAt: new Date(),
                   }
                 : c
             )
@@ -610,8 +621,9 @@ export default function ChatPage() {
                 ? {
                     ...c,
                     messages: c.messages.map((m) =>
-                      m.id === assistantId ? { ...m, content: imgResult?.error ? `Image generation failed: ${imgResult.error}` : "Sorry, I couldn't generate that image. Please try again later." } : m
+                      m.id === assistantId ? { ...m, content: imgResult?.error ? `Image generation failed: ${imgResult.error}` : "Sorry, I couldn't generate that image. Please try again later.", isStreaming: false } : m
                     ),
+                    updatedAt: new Date(),
                   }
                 : c
             )
@@ -922,6 +934,17 @@ ${getAdminContext()}` : ""}`,
     setShowGodTerminal(true);
   };
 
+  const handleCloseGodMode = () => {
+    setShowGodTerminal(false);
+    setIsGodModeActive(false);
+    setShowEthicalHackingQuiz(false);
+    const returnConversationId = godModeReturnConversationIdRef.current;
+    godModeReturnConversationIdRef.current = null;
+    activeIdRef.current = returnConversationId;
+    setActiveId(returnConversationId);
+    shouldAutoScrollRef.current = true;
+  };
+
   const toggleScreenGuider = () => {
     const newState = !screenGuiderActive;
     setScreenGuiderActive(newState);
@@ -932,9 +955,22 @@ ${getAdminContext()}` : ""}`,
     }
   };
 
-  // Auto scroll to bottom
+  // Keep follow-up scrolling inside the chat pane. scrollIntoView can scroll
+  // ancestor windows during streamed updates and pull the whole desktop UI up.
+  const updateChatScrollIntent = () => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    shouldAutoScrollRef.current = container.scrollHeight - container.clientHeight - container.scrollTop < 140;
+  };
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!shouldAutoScrollRef.current) return;
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const frame = window.requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight;
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [conversations, activeId]);
 
   const activeConversation = conversations.find((c) => c.id === activeId);
@@ -1132,7 +1168,7 @@ ${getAdminContext()}` : ""}`,
         />
       )}
 
-      <main className="flex-1 flex flex-col relative min-w-0">
+      <main className="flex-1 flex flex-col relative min-w-0 min-h-0 overflow-hidden">
         {/* Top Header */}
         <header className="h-16 flex items-center justify-between px-6 z-20 flex-shrink-0">
           <div className="flex items-center gap-4">
@@ -1172,6 +1208,7 @@ ${getAdminContext()}` : ""}`,
         {/* Chat Area */}
         <div 
           ref={messagesContainerRef}
+          onScroll={updateChatScrollIntent}
           className="flex-1 overflow-y-auto scrollbar-hide px-4 md:px-0"
         >
           <AnimatePresence mode="wait">
@@ -1327,11 +1364,7 @@ ${getAdminContext()}` : ""}`,
         {showGodTerminal && (
           <GodModeTerminal 
             isOpen={showGodTerminal}
-            onClose={() => {
-              setShowGodTerminal(false);
-              setIsGodModeActive(false);
-              setShowEthicalHackingQuiz(false);
-            }}
+            onClose={handleCloseGodMode}
             onOpenQuiz={() => setShowEthicalHackingQuiz(true)}
             onOpenCEOProfile={() => setShowCEOProfile(true)}
             onExecute={executeGodCommand}

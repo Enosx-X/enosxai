@@ -215,7 +215,11 @@ export default function Sidebar({
       {/* Conversation history */}
       <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-2 space-y-1 scrollbar-thin">
         <AnimatePresence initial={false}>
-          {conversations.map((conv, i) => (
+          {conversations.map((conv, i) => {
+            const isGodModeConversation = /^GOD MODE\b/i.test(conv.title);
+            const ConversationIcon = isGodModeConversation ? Crown : MessageSquare;
+            const modeAccent = isGodModeConversation ? "#fbbf24" : config.accent;
+            return (
             <motion.div
               key={conv.id}
               initial={{ opacity: 0, scale: 0.8 }}
@@ -233,10 +237,10 @@ export default function Sidebar({
                 style={
                   activeId === conv.id
                     ? {
-                        background: `rgba(${config.accentRgb}, 0.14)`,
-                        border: `1px solid rgba(${config.accentRgb}, 0.28)`,
+                        background: isGodModeConversation ? "rgba(251,191,36,0.12)" : `rgba(${config.accentRgb}, 0.14)`,
+                        border: isGodModeConversation ? "1px solid rgba(251,191,36,0.32)" : `1px solid rgba(${config.accentRgb}, 0.28)`,
                         color: config.text,
-                        boxShadow: `0 0 12px rgba(${config.accentRgb}, 0.1)`,
+                        boxShadow: isGodModeConversation ? "0 0 12px rgba(251,191,36,0.1)" : `0 0 12px rgba(${config.accentRgb}, 0.1)`,
                       }
                     : {
                         background: "transparent",
@@ -246,9 +250,9 @@ export default function Sidebar({
                 }
                 title={collapsed ? conv.title : undefined}
               >
-                <MessageSquare
+                <ConversationIcon
                   size={13}
-                  style={{ color: activeId === conv.id ? config.accent : config.textMuted, flexShrink: 0 }}
+                  style={{ color: activeId === conv.id || isGodModeConversation ? modeAccent : config.textMuted, flexShrink: 0 }}
                 />
                 {!collapsed && (
                   <span className="text-sm truncate flex-1">
@@ -269,7 +273,8 @@ export default function Sidebar({
               )}
               </div>
             </motion.div>
-          ))}
+            );
+          })}
         </AnimatePresence>
       </div>
 

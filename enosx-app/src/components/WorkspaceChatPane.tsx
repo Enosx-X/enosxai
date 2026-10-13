@@ -51,6 +51,8 @@ interface WorkspaceChatPaneProps {
 export default function WorkspaceChatPane({ onExecuteAction }: WorkspaceChatPaneProps) {
   const { config } = useTheme();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
   const sendingRef = useRef(false);
 
   const [conversation, setConversation] = useState<Conversation>({
@@ -78,8 +80,20 @@ export default function WorkspaceChatPane({ onExecuteAction }: WorkspaceChatPane
   const error = chatError;
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!shouldAutoScrollRef.current) return;
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const frame = window.requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight;
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [messages, isLoading]);
+
+  const updateChatScrollIntent = () => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    shouldAutoScrollRef.current = container.scrollHeight - container.clientHeight - container.scrollTop < 120;
+  };
 
   const handleSend = useCallback(
     async (text: string, aiMode?: AIMode) => {
@@ -199,7 +213,7 @@ Current System Status: ONLINE`,
         </span>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+      <div ref={messagesContainerRef} onScroll={updateChatScrollIntent} className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl border text-2xl font-black" style={{ borderColor: `rgba(${config.accentRgb},0.3)`, color: config.accent, background: `rgba(${config.accentRgb},0.08)` }}>EX</div>

@@ -82,7 +82,9 @@ language can be "python", "shell", or "batch". Keep scripts short and self-conta
 GOD MODE:
 When a user message begins with [GOD MODE COMMAND], switch to advanced operator mode. Give concise, direct, implementation-first answers.`;
 
-const MAX_HISTORY_MESSAGES = 28;
+// Keep enough recent context for continuity without repeatedly pre-filling
+// very long transcripts on every streamed turn.
+const MAX_HISTORY_MESSAGES = 20;
 const MAX_MESSAGE_CHARS = 20_000;
 const PROVIDER_RETRY_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 
