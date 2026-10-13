@@ -1,3 +1,9 @@
+## v0.1.17 — Adaptive Composer
+
+- Narrowed the message composer for a more focused chat layout while retaining responsive mobile sizing.
+- Replaced the static composer hint with “Intelligent real-time monitoring...” and automatically tailors it when image/video attachments are present, including mixed media.
+- Passed visual attachment context consistently through desktop, phone, and TV chat layouts.
+
 ## v0.1.16 — Personalized replies & notifications
 - Added signed-in name, email, language, personality, and theme preferences to the assistant's private per-request context, with guidance to use personal details only when relevant.
 - Completed assistant replies now generate a reply-specific system notification using the response text.

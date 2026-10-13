@@ -11,7 +11,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowUp, Mic, MicOff, Square, Loader2, ChevronDown, Paperclip, ListChecks, Languages, Code2, Sparkles } from "lucide-react";
-import { VoiceState } from "@/lib/types";
+import { VoiceState, type Attachment } from "@/lib/types";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useWallpaper } from "@/contexts/WallpaperContext";
 import VoiceVisualizer from "./VoiceVisualizer";
@@ -74,6 +74,7 @@ interface CommandBarProps {
   disabled?: boolean;
   isFreeMode?: boolean;
   onFilesSelected?: (files: File[]) => void;
+  attachments?: Attachment[];
 }
 
 export default function CommandBar({
@@ -88,6 +89,7 @@ export default function CommandBar({
   disabled = false,
   isFreeMode = false,
   onFilesSelected,
+  attachments = [],
 }: CommandBarProps) {
   const { config } = useTheme();
   const { settings: wallpaperSettings } = useWallpaper();
@@ -116,6 +118,19 @@ export default function CommandBar({
   const voiceActive = isListening || isSpeaking || isProcessing;
 
   const currentMode = AI_MODES.find((m) => m.id === aiMode) ?? AI_MODES[0];
+  const hasImageAttachment = attachments.some((file) =>
+    /image/i.test(`${file.mimeType ?? ""} ${file.type}`) || /\.(png|jpe?g|gif|webp|bmp|avif|heic)$/i.test(file.name),
+  );
+  const hasVideoAttachment = attachments.some((file) =>
+    /video/i.test(`${file.mimeType ?? ""} ${file.type}`) || /\.(mp4|m4v|webm|mov|avi|mkv)$/i.test(file.name),
+  );
+  const contextualPlaceholder = hasImageAttachment && hasVideoAttachment
+    ? "Analyze your image and video in real time..."
+    : hasVideoAttachment
+      ? "Ask ENOSX to inspect your video in real time..."
+      : hasImageAttachment
+        ? "Ask ENOSX to analyze your image..."
+        : "Intelligent real-time monitoring...";
 
   // Sync transcript to input
   useEffect(() => {
@@ -185,7 +200,7 @@ export default function CommandBar({
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ type: "spring", stiffness: 300, damping: 30, delay: 0.1 }}
-          className="max-w-5xl mx-auto"
+          className="mx-auto w-full max-w-3xl"
         >
           {/* Main input container */}
           <motion.div
@@ -366,13 +381,13 @@ export default function CommandBar({
                   }
                 }}
                 onKeyDown={handleKeyDown}
-	                placeholder={
-	                  isListening
-	                    ? "Listening... Speak now."
-	                    : isSpeaking
-	                    ? "AI is speaking..."
-	                    : "Ask ENOSX AI anything."
-	                }
+                placeholder={
+                  isListening
+                    ? "Listening... Speak now."
+                    : isSpeaking
+                      ? "AI is speaking..."
+                      : contextualPlaceholder
+                }
                 rows={1}
                 disabled={disabled && !isListening}
                 className="flex-1 bg-transparent outline-none resize-none text-sm leading-snug"

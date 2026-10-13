@@ -973,6 +973,7 @@ ${getAdminContext()}` : ""}`,
           messagesEndRef={messagesEndRef as React.RefObject<HTMLDivElement>}
           isFreeMode={isFreeMode}
           onFilesSelected={handleFilesSelected}
+          attachments={fileContext.files}
         />
       </GlobalLayout>
     );
@@ -1006,6 +1007,7 @@ ${getAdminContext()}` : ""}`,
           messagesEndRef={messagesEndRef as React.RefObject<HTMLDivElement>}
           isFreeMode={isFreeMode}
           onFilesSelected={handleFilesSelected}
+          attachments={fileContext.files}
           onSettingsClick={() => setShowProfilePanel(true)}
         />
       </GlobalLayout>
@@ -1235,6 +1237,7 @@ ${getAdminContext()}` : ""}`,
               transcript={transcript}
               isFreeMode={isFreeMode}
               onFilesSelected={handleFilesSelected}
+              attachments={fileContext.files}
             />
           </div>
         </div>

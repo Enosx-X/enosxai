@@ -5,7 +5,7 @@ import Sidebar from "./Sidebar";
 import MessageBubble from "./MessageBubble";
 import CommandBar, { type AIMode } from "./CommandBar";
 import WelcomeScreen from "./WelcomeScreen";
-import { Conversation, Message, VoiceState } from "@/lib/types";
+import { Conversation, Message, VoiceState, type Attachment } from "@/lib/types";
 import { useTheme } from "@/contexts/ThemeContext";
 
 interface PhoneChatLayoutProps {
@@ -29,6 +29,7 @@ interface PhoneChatLayoutProps {
   messagesEndRef: React.RefObject<HTMLDivElement>;
   isFreeMode?: boolean;
   onFilesSelected?: (files: File[]) => void;
+  attachments?: Attachment[];
   onSettingsClick?: () => void;
 }
 
@@ -53,6 +54,7 @@ export default function PhoneChatLayout({
   messagesEndRef,
   isFreeMode = false,
   onFilesSelected,
+  attachments = [],
   onSettingsClick,
 }: PhoneChatLayoutProps) {
   const { config } = useTheme();
@@ -114,6 +116,7 @@ export default function PhoneChatLayout({
           onStopSpeaking={stopSpeaking}
           isFreeMode={isFreeMode}
           onFilesSelected={onFilesSelected}
+          attachments={attachments}
         />
       </div>
 
