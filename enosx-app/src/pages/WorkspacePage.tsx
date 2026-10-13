@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Columns2, Columns3, MonitorSmartphone } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { showError } from "@/lib/errorReporting";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { GlobalLayout } from "@/components/GlobalLayout";
 import WorkspaceChatPane from "@/components/WorkspaceChatPane";
@@ -128,7 +129,7 @@ function WorkspacePageInner() {
           }
           openWindow("browser");
         } catch (err) {
-          toast.error(`Web action failed: ${err instanceof Error ? err.message : String(err)}`);
+          showError(`Web action failed: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
 

@@ -15,7 +15,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useWallpaper } from "@/contexts/WallpaperContext";
 import ImageDisplay from "./ImageDisplay";
 import VideoDisplay from "./VideoDisplay";
-import MediaAttachment from "./MediaAttachment";
+import MediaAttachmentList from "./MediaAttachmentList";
 import { downloadDocument } from "@/lib/documentExport";
 
 interface MessageBubbleProps {
@@ -337,11 +337,9 @@ export default function MessageBubble({
             <div className="relative">
               {isUser ? (
                 <div className="flex flex-col gap-3">
-                  {/* User attachments — preview images, music, video, or downloadable files */}
+                  {/* User attachments — images are grouped into one browsable collection */}
                   {message.attachments && message.attachments.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-1">
-                      {message.attachments.map((att) => <MediaAttachment key={att.id} attachment={att} />)}
-                    </div>
+                    <MediaAttachmentList attachments={message.attachments} />
                   )}
                   <div
                     className="text-base leading-relaxed"
@@ -354,9 +352,7 @@ export default function MessageBubble({
                 <div className="flex flex-col gap-3">
                   {/* Assistant media attachments */}
                   {message.attachments && message.attachments.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-1">
-                      {message.attachments.map((att) => <MediaAttachment key={att.id} attachment={att} />)}
-                    </div>
+                    <MediaAttachmentList attachments={message.attachments} />
                   )}
                   {/* Assistant content with inline image support */}
                   {renderContentWithMedia(message.content, config.accent, isStreaming)}

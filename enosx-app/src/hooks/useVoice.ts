@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { showError } from "@/lib/errorReporting";
 import { VoiceState } from "@/lib/types";
 
 const VOICE_SERVICE_URL = "/api/voice";
@@ -205,14 +206,14 @@ export function useVoice() {
       const language = requestedLanguage || languageRef.current;
 
       if (!isSupported) {
-        toast.error(
+        showError(
           "Voice input is not supported in this browser. Please use the latest Chrome or Edge."
         );
         return;
       }
 
       if (!window.isSecureContext && window.location.hostname !== "localhost") {
-        toast.error("Voice input requires a secure HTTPS connection.");
+        showError("Voice input requires a secure HTTPS connection.");
         return;
       }
 
@@ -236,7 +237,7 @@ export function useVoice() {
             : name === "NotFoundError"
               ? "No microphone was found. Check that a microphone is connected and available."
               : "We could not access your microphone. Check your browser permission and try again.";
-        toast.error(message);
+        showError(message);
         setVoiceState("idle");
         return;
       }
@@ -251,7 +252,7 @@ export function useVoice() {
         }).webkitSpeechRecognition;
 
       if (!SpeechRecognitionAPI) {
-        toast.error("Voice input is not available in this browser.");
+        showError("Voice input is not available in this browser.");
         return;
       }
 
@@ -311,7 +312,7 @@ export function useVoice() {
         if (recognitionRef.current !== recognition) return;
         recognitionRef.current = null;
         setVoiceState("idle");
-        toast.error(getRecognitionErrorMessage(event.error));
+        showError(getRecognitionErrorMessage(event.error));
       };
 
       recognition.onend = () => {
@@ -327,7 +328,7 @@ export function useVoice() {
         recognitionRef.current = null;
         setVoiceState("idle");
         console.error("Speech recognition could not start", error);
-        toast.error("Voice input could not start. Please try again.");
+        showError("Voice input could not start. Please try again.");
       }
     },
     [isSupported, stopListening]
@@ -421,14 +422,14 @@ export function useVoice() {
               if (requestId !== speechRequestIdRef.current) return;
               console.error("ENOSX voice service failed", error);
               setVoiceState("idle");
-              toast.error("The selected ENOSX voice could not finish speaking this response.");
+              showError("The selected ENOSX voice could not finish speaking this response.");
             });
           };
           audio.onerror = () => {
             if (audioRef.current !== audio) return;
             releaseAudio();
             setVoiceState("idle");
-            toast.error("The ENOSX voice service could not play this response.");
+            showError("The ENOSX voice service could not play this response.");
           };
           await audio.play();
         };
@@ -439,7 +440,7 @@ export function useVoice() {
         console.error("ENOSX voice service failed", error);
         releaseAudio();
         setVoiceState("idle");
-        toast.error(error instanceof Error ? error.message : "NVIDIA voice is unavailable. Please try again.");
+        showError(error instanceof Error ? error.message : "NVIDIA voice is unavailable. Please try again.");
       }
     },
     [releaseAudio, scheduleListenAgain, stopSpeaking]

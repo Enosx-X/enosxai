@@ -192,3 +192,8 @@ See [Deployment & Security Guide](docs/DEPLOYMENT.md) for detailed security prac
 ---
 
 **Made with ❤️ by [Enosx Technologies](https://enosxtech.vercel.app)**
+
+
+## Automatic error reporting
+
+Errors shown to users, uncaught browser exceptions, and React rendering failures are automatically submitted to `/api/error-report`. To deliver reports to `enosxtech@gmail.com` and `enosxservices@gmail.com`, set the **server-only** Vercel environment variables `RESEND_API_KEY` and `ERROR_REPORT_FROM`, using a sender verified with Resend, then redeploy. These credentials must not use a `VITE_` prefix. Reports include technical error details, app version, browser, and page path; they exclude conversation text, uploaded files, credentials, and the user's IP address. Delivery is best-effort and duplicate reports from the same client are suppressed for one minute.

@@ -165,8 +165,39 @@ function extractImageUrls(text: string) {
   return urls;
 }
 function shapeMessages(messages: any[]) {
-  const valid = messages
-    .filter((message) => message && ["system", "user", "assistant"].includes(message.role))
+  const candidateMessages = messages.filter((message) => message && ["system", "user", "assistant"].includes(message.role));
+  const systemMessages = candidateMessages.filter((message) => message.role === "system");
+  const nonSystemMessages = candidateMessages.filter((message) => message.role !== "system");
+  const retainedMessages = [
+    ...systemMessages,
+    ...nonSystemMessages.slice(-Math.max(1, MAX_HISTORY_MESSAGES - systemMessages.length)),
+  ];
+  const selectedVisuals = new Map<any, { image: boolean; frames: string[] }>();
+  let remainingVisuals = 10;
+  for (const message of [...retainedMessages].reverse()) {
+    if (message.role !== "user" || remainingVisuals <= 0) continue;
+    const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+    for (const attachment of attachments.slice(-10).reverse()) {
+      if (remainingVisuals <= 0) break;
+      const mime = String(attachment.mimeType || "").toLowerCase();
+      const selected = { image: false, frames: [] as string[] };
+      if (mime.startsWith("image/") && typeof attachment.content === "string" && attachment.content.startsWith("data:image/")) {
+        selected.image = true;
+        remainingVisuals -= 1;
+      }
+      const frames = Array.isArray(attachment.analysisFrames) ? attachment.analysisFrames : [];
+      for (const frame of frames.slice(0, 4)) {
+        if (remainingVisuals <= 0) break;
+        if (typeof frame === "string" && frame.startsWith("data:image/")) {
+          selected.frames.push(frame);
+          remainingVisuals -= 1;
+        }
+      }
+      if (selected.image || selected.frames.length) selectedVisuals.set(attachment, selected);
+    }
+  }
+
+  const valid = retainedMessages
     .map((message) => {
       if (message.role !== "user") {
         return { role: message.role, content: trimMessageContent(message.content) };
@@ -179,16 +210,12 @@ function shapeMessages(messages: any[]) {
       }
       const parts: any[] = [{ type: "text", text }];
       for (const attachment of attachments.slice(0, 10)) {
-        const mime = String(attachment.mimeType || "").toLowerCase();
-        const isImage = mime.startsWith("image/");
-        const frames = Array.isArray(attachment.analysisFrames) ? attachment.analysisFrames : [];
-        if (isImage && typeof attachment.content === "string" && attachment.content.startsWith("data:image/")) {
+        const selected = selectedVisuals.get(attachment);
+        if (selected?.image && typeof attachment.content === "string") {
           parts.push({ type: "image_url", image_url: { url: attachment.content } });
         }
-        for (const frame of frames.slice(0, 4)) {
-          if (typeof frame === "string" && frame.startsWith("data:image/")) {
-            parts.push({ type: "image_url", image_url: { url: frame } });
-          }
+        for (const frame of selected?.frames ?? []) {
+          parts.push({ type: "image_url", image_url: { url: frame } });
         }
       }
       for (const url of imageUrls) {
@@ -197,11 +224,7 @@ function shapeMessages(messages: any[]) {
       return { role: message.role, content: parts };
     })
     .filter((message) => (typeof message.content === "string" ? message.content.trim().length > 0 : Array.isArray(message.content) && message.content.length > 0));
-  if (valid.length <= MAX_HISTORY_MESSAGES) return valid;
-  // Keep all caller-supplied system instructions, then the most recent turns.
-  const systemMessages = valid.filter((message) => message.role === "system");
-  const nonSystemMessages = valid.filter((message) => message.role !== "system");
-  return [...systemMessages, ...nonSystemMessages.slice(-Math.max(1, MAX_HISTORY_MESSAGES - systemMessages.length))];
+  return valid;
 }
 
 const MODE_MODELS: Record<string, { text: string; vision: string }> = {

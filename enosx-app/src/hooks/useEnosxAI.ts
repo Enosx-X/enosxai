@@ -7,6 +7,7 @@
 import { useState, useCallback } from "react";
 import { Attachment, Message } from "@/lib/types";
 import { chatWithLocalModel, isDesktopShell, readLocalModelSettings } from "@/lib/localModels";
+import { reportClientError } from "@/lib/errorReporting";
 
 type ChatOptions = {
   aiMode?: string;
@@ -203,6 +204,7 @@ export function useEnosxAI() {
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Unknown error";
         const friendlyError = usingLocalModel ? `Local model error: ${errorMessage}` : getFriendlyErrorMessage(errorMessage);
+        reportClientError(err, "ai.request");
         setError(friendlyError);
         console.error("[useEnosxAI] Error:", errorMessage);
 

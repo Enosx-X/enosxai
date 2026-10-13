@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
+import { showError } from "@/lib/errorReporting";
 
 interface ImageGenerationResult {
   url?: string;
@@ -46,7 +47,7 @@ export function useImageGeneration() {
           }
           setError(message);
           if (response.status !== 503) {
-            toast.error(message);
+            showError(message);
           }
           return { error: message };
         }
@@ -66,7 +67,7 @@ export function useImageGeneration() {
         const message =
           err instanceof Error ? err.message : "NVIDIA image generation failed.";
         setError(message);
-        toast.error(message);
+        showError(message);
         return { error: message };
       } finally {
         setIsGenerating(false);

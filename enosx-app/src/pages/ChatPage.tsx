@@ -8,6 +8,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
+import { showError } from "@/lib/errorReporting";
 import Sidebar from "@/components/Sidebar";
 import MessageBubble from "@/components/MessageBubble";
 import CommandBar, { type AIMode } from "@/components/CommandBar";
@@ -414,7 +415,7 @@ export default function ChatPage() {
   const handleFileUpload = useCallback(
     async (file: File) => {
       if (fileContext.files.length >= 10) {
-        toast.error("Maximum 10 files allowed");
+        showError("Maximum 10 files allowed");
         return;
       }
 
@@ -424,7 +425,7 @@ export default function ChatPage() {
       const isVideo = file.type.startsWith("video/") || ["mp4", "webm", "mov", "m4v", "avi", "mkv"].includes(extension);
       const maxSize = isVideo ? 100 * 1024 * 1024 : 25 * 1024 * 1024;
       if (file.size > maxSize) {
-        toast.error("File too large (maximum 25MB per file)");
+        showError("File too large (maximum 25MB per file)");
         return;
       }
       try {
@@ -433,15 +434,20 @@ export default function ChatPage() {
         toast.success(`${file.name} is ready for ENOSX analysis`);
       } catch (error) {
         console.error("[ChatPage] File analysis failed", error);
-        toast.error(`Could not analyze ${file.name}. Try a smaller or supported file.`);
+        showError(`Could not analyze ${file.name}. Try a smaller or supported file.`);
       }
     },
     [fileContext.files.length, loadFile]
   );
 
   const handleFilesSelected = useCallback((files: File[]) => {
-    files.forEach((file) => { void handleFileUpload(file); });
-  }, [handleFileUpload]);
+    const remaining = Math.max(0, 10 - fileContext.files.length);
+    if (files.length > remaining) showError(`You can attach up to 10 files per message. ${remaining} slot${remaining === 1 ? "" : "s"} remaining.`);
+    const acceptedFiles = files.slice(0, remaining);
+    void (async () => {
+      for (const file of acceptedFiles) await handleFileUpload(file);
+    })();
+  }, [fileContext.files.length, handleFileUpload]);
 
   const [isGodModeActive, setIsGodModeActive] = useState(false);
   // Standalone split-screen toggle (shared with /workspace via localStorage).
@@ -501,7 +507,7 @@ export default function ChatPage() {
         data: { url: window.location.href },
       });
     } else if (permission === "denied") {
-      toast.error("Notifications are blocked. Enable them in your browser site settings.");
+      showError("Notifications are blocked. Enable them in your browser site settings.");
     }
   }, []);
 
@@ -987,7 +993,7 @@ ${getAdminContext()}` : ""}`,
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
-      toast.error("Could not share this conversation");
+      showError("Could not share this conversation");
     }
   }, [activeConversation]);
   const handleCopyConversation = useCallback(async () => {

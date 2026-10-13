@@ -1,5 +1,11 @@
-## v0.1.19 — Chat stability, GOD MODE separation & faster generation
+## v0.1.20 — Image collections & error reporting
 
+- Group uploaded photos into a compact, navigable collection with a full-screen viewer.
+- Reduce image analysis payloads and process multi-file uploads sequentially to avoid oversized chat requests; limit a chat request to its ten most recent visual attachments.
+- Move notifications to the upper-right and automatically report user-visible and uncaught client errors to ENOSX support.
+- Add a rate-limited server-side email relay; configure a verified Resend sender and `RESEND_API_KEY` / `ERROR_REPORT_FROM` in Vercel to enable delivery.
+
+## v0.1.19 — Chat stability, GOD MODE separation & faster generation
 - Kept streamed chat scrolling inside its own pane and prevented long replies from shifting the surrounding desktop window.
 - Moved GOD MODE command conversations into a separate, clearly labeled chat and restored the prior regular chat when GOD MODE closes.
 - Updated GOD MODE history and terminal iconography with a distinct crown marker and highlight.

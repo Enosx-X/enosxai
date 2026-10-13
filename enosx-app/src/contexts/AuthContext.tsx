@@ -15,6 +15,7 @@ import {
 } from "firebase/auth";
 import { firebaseAuth, firebaseConfigured, requireFirebase } from "@/lib/firebase";
 import { loadUserProfile, saveUserProfile } from "@/lib/firebaseStorage";
+import { reportClientError } from "@/lib/errorReporting";
 
 export interface UserProfile {
   id: string;
@@ -87,6 +88,7 @@ function loadGuest(): UserProfile | null {
 }
 
 function firebaseErrorMessage(error: unknown): string {
+  reportClientError(error, "auth");
   const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
   if (code === "auth/operation-not-allowed") return "Enable this sign-in method in Firebase Console → Authentication → Sign-in method.";
   if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") return "Invalid email or password.";
@@ -131,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = () => {
     if (!firebaseAuth) {
+      reportClientError("Firebase is not configured for authentication.", "auth.configuration");
       setState((previous) => ({ ...previous, error: "Firebase is not configured. Set the VITE_FIREBASE_* values before signing in." }));
       return;
     }
@@ -141,6 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithEmail = async (email: string, password: string): Promise<boolean> => {
     if (!firebaseAuth) {
+      reportClientError("Firebase is not configured for authentication.", "auth.configuration");
       setState((previous) => ({ ...previous, error: "Firebase is not configured. Set the VITE_FIREBASE_* values before signing in." }));
       return false;
     }
@@ -156,6 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUpWithEmail = async (email: string, password: string, displayName: string): Promise<boolean> => {
     if (!firebaseAuth) {
+      reportClientError("Firebase is not configured for authentication.", "auth.configuration");
       setState((previous) => ({ ...previous, error: "Firebase is not configured. Set the VITE_FIREBASE_* values before creating an account." }));
       return false;
     }

@@ -68,6 +68,8 @@ function App() {
                   <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
                     <Toaster
                       theme="dark"
+                      position="top-right"
+                      visibleToasts={4}
                       toastOptions={{
                         style: {
                           background: "rgba(18,18,24,0.95)",
