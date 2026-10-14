@@ -1,6 +1,13 @@
 import { Router, Request, Response } from "express";
 
 const imageRouter = Router();
+const SD35_ENDPOINT = "https://ai.api.nvidia.com/v1/genai/stabilityai/stable-diffusion-3.5-large";
+const SUPPORTED_SIZES = new Set(["1024x1024", "768x1344", "1344x768", "1216x832"]);
+
+function boundedNumber(value: unknown, fallback: number, min: number, max: number) {
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
+}
 
 imageRouter.post("/image/generate", async (req: Request, res: Response) => {
   try {
@@ -15,9 +22,9 @@ imageRouter.post("/image/generate", async (req: Request, res: Response) => {
       return;
     }
 
-    if (trimmedPrompt.length > 4000) {
+    if (trimmedPrompt.length > 800) {
       res.status(400).json({
-        error: "Prompt exceeds maximum length of 4000 characters",
+        error: "Prompt exceeds maximum length of 800 characters",
         status: "VALIDATION_ERROR",
       });
       return;
@@ -33,20 +40,36 @@ imageRouter.post("/image/generate", async (req: Request, res: Response) => {
     }
 
     const configuredEndpoint = process.env.NVIDIA_IMAGE_ENDPOINT?.trim();
-    const model = process.env.NVIDIA_IMAGE_MODEL?.trim() || "FLUX.1-schnell";
-    const configuredIsBuilderPage = configuredEndpoint?.includes("build.nvidia.com");
-    const endpoint = configuredIsBuilderPage || !configuredEndpoint
-      ? `https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-schnell`
-      : configuredEndpoint;
-    const payload: Record<string, unknown> = {
-      prompt: trimmedPrompt,
-      height: 1024,
-      width: 1024,
-      seed: 0,
-      steps: 4,
-      samples: 1,
-    };
-    if (!configuredIsBuilderPage && model) payload.model = model;
+    const endpoint = configuredEndpoint || SD35_ENDPOINT;
+    const model = process.env.NVIDIA_IMAGE_MODEL?.trim() || (configuredEndpoint ? "" : "stabilityai/stable-diffusion-3.5-large");
+    const usesStableDiffusion35 = /stabilityai\/stable-diffusion-3\.5-large\/?$/i.test(endpoint)
+      || /stabilityai\/stable-diffusion-3\.5-large/i.test(model);
+    const requestedWidth = boundedNumber(req.body?.width, 1024, 64, 2048);
+    const requestedHeight = boundedNumber(req.body?.height, 1024, 64, 2048);
+    const requestedSize = `${requestedWidth}x${requestedHeight}`;
+    const dimensions = SUPPORTED_SIZES.has(requestedSize)
+      ? { width: requestedWidth, height: requestedHeight }
+      : { width: 1024, height: 1024 };
+    const mode = ["base", "canny", "depth"].includes(req.body?.mode) ? req.body.mode : "base";
+    const payload: Record<string, unknown> = usesStableDiffusion35
+      ? {
+          prompt: trimmedPrompt,
+          mode,
+          ...dimensions,
+          cfg_scale: boundedNumber(req.body?.cfg_scale, 5, 0, 20),
+          steps: boundedNumber(req.body?.steps, 28, 1, 100),
+          seed: boundedNumber(req.body?.seed, 0, 0, 2_147_483_647),
+          ...(typeof req.body?.image === "string" ? { image: req.body.image } : {}),
+        }
+      : {
+          prompt: trimmedPrompt,
+          model,
+          height: 1024,
+          width: 1024,
+          seed: 0,
+          steps: 4,
+          samples: 1,
+        };
 
     const response = await fetch(endpoint, {
       method: "POST",

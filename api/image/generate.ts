@@ -3,14 +3,14 @@
  * Generates images through the configured NVIDIA image endpoint. Credentials
  * remain server-side and the browser receives a self-contained data URL so
  * generated images remain downloadable after a chat is reloaded. The hosted
- * FLUX.2 Klein handles prompt-only generation; uploaded-image edits use the
- * configured FLUX.1 Kontext route.
+ * Stable Diffusion 3.5 Large handles the default prompt-to-image flow. Other
+ * NVIDIA image endpoints remain configurable for existing deployments.
  *
  * Server-only environment variables:
  *   - NVIDIA_IMAGE_API_KEY (required for image generation; falls back to NVIDIA_API_KEY)
  *   - NVIDIA_API_KEY (legacy/shared fallback)
- *   - NVIDIA_IMAGE_ENDPOINT (required)
- *   - NVIDIA_IMAGE_MODEL (optional)
+ *   - NVIDIA_IMAGE_ENDPOINT (optional; defaults to hosted Stable Diffusion 3.5 Large)
+ *   - NVIDIA_IMAGE_MODEL (optional; defaults to stabilityai/stable-diffusion-3.5-large)
  *
  * Request body:
  *   { prompt: string, image?: string, mode?: string, width?: number,
@@ -27,12 +27,22 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import sharp from "sharp";
 
 const DEFAULT_PROMPT = "Create a polished image based on the supplied prompt.";
-const DEFAULT_WIDTH = 512;
-const DEFAULT_HEIGHT = 512;
+const DEFAULT_WIDTH = 1024;
+const DEFAULT_HEIGHT = 1024;
 const DEFAULT_DIFFUSION_STEPS = 20;
 const MAX_PROMPT_LENGTH = 800;
 const MAX_IMAGE_LENGTH = 8_000_000;
+const NVIDIA_HOSTED_SD35_ENDPOINT = "https://ai.api.nvidia.com/v1/genai/stabilityai/stable-diffusion-3.5-large";
 const NVIDIA_HOSTED_FLUX2_ENDPOINT = "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.2-klein-4b";
+
+function stableDiffusion35Dimensions(body: any) {
+  const width = asBoundedNumber(body.width, DEFAULT_WIDTH, 64, 2048);
+  const height = asBoundedNumber(body.height, DEFAULT_HEIGHT, 64, 2048);
+  const supported = new Set(["1024x1024", "768x1344", "1344x768", "1216x832"]);
+  return supported.has(`${width}x${height}`)
+    ? { width, height }
+    : { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
+}
 
 function asBoundedNumber(value: unknown, fallback: number, min: number, max: number) {
   const number = typeof value === "number" ? value : Number(value);
@@ -137,8 +147,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const apiKey = (process.env.NVIDIA_IMAGE_API_KEY || process.env.NVIDIA_API_KEY)?.trim();
-  const endpoint = process.env.NVIDIA_IMAGE_ENDPOINT?.trim();
-  if (!apiKey || !endpoint) {
+  const configuredEndpoint = process.env.NVIDIA_IMAGE_ENDPOINT?.trim();
+  const endpoint = configuredEndpoint || NVIDIA_HOSTED_SD35_ENDPOINT;
+  if (!apiKey) {
     console.error("[IMAGE] NVIDIA image credentials are not configured.");
     return res.status(503).json({
       error: "NVIDIA image generation is not configured on the server",
@@ -166,7 +177,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const image = typeof body.image === "string" ? body.image.trim() : "";
-  const model = process.env.NVIDIA_IMAGE_MODEL?.trim();
+  const model = process.env.NVIDIA_IMAGE_MODEL?.trim() || (configuredEndpoint ? "" : "stabilityai/stable-diffusion-3.5-large");
+  const usesStableDiffusion35 = /stabilityai\/stable-diffusion-3\.5-large\/?$/i.test(endpoint)
+    || /stabilityai\/stable-diffusion-3\.5-large/i.test(model);
   const usesOpenAiImageApi = /\/v1\/images\/generations\/?$/i.test(endpoint);
   const usesFluxKontextApi = /\/v1\/genai\/black-forest-labs\/flux\.1-kontext-dev\/?$/i.test(endpoint);
   const usesFlux2KleinEndpoint = /\/v1\/genai\/black-forest-labs\/flux\.2-klein-4b\/?$/i.test(endpoint);
@@ -209,7 +222,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
   const imagePayload = image && image.startsWith("data:image/") ? image : image ? `data:image/png;base64,${image}` : "";
-  const payload: Record<string, unknown> = usesFlux2KleinApi
+  const sd35Dimensions = stableDiffusion35Dimensions(body);
+  const sd35Mode = ["base", "canny", "depth"].includes(body.mode) ? body.mode : "base";
+  const payload: Record<string, unknown> = usesStableDiffusion35
+    ? {
+        prompt,
+        mode: sd35Mode,
+        ...sd35Dimensions,
+        cfg_scale: asBoundedNumber(body.cfg_scale, 5, 0, 20),
+        steps: asBoundedNumber(body.steps, 28, 1, 100),
+        seed: asBoundedNumber(body.seed, 0, 0, 2_147_483_647),
+        ...(imagePayload ? { image: imagePayload } : {}),
+      }
+    : usesFlux2KleinApi
     ? createFlux2Payload(prompt, body, imagePayload)
     : usesFluxKontextApi
     ? {
@@ -243,11 +268,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     payload.size = `${width}x${height}`;
   }
   if (body.seed !== undefined) payload.seed = asBoundedNumber(body.seed, 0, 0, 2_147_483_647);
-  if (!usesOpenAiImageApi && !usesFluxKontextApi && !usesFlux2KleinApi && model) payload.model = model;
+  if (!usesStableDiffusion35 && !usesOpenAiImageApi && !usesFluxKontextApi && !usesFlux2KleinApi && model) payload.model = model;
   if (!usesOpenAiImageApi && !usesFluxKontextApi && !usesFlux2KleinApi && imagePayload) payload.image = imagePayload;
 
   console.log("[IMAGE] Generating with NVIDIA image endpoint", {
-    model: usesFlux2KleinApi ? "black-forest-labs/flux.2-klein-4b" : model || "endpoint-default",
+    model: usesStableDiffusion35 ? "stabilityai/stable-diffusion-3.5-large" : usesFlux2KleinApi ? "black-forest-labs/flux.2-klein-4b" : model || "endpoint-default",
     hasInputImage: Boolean(imagePayload),
     promptLength: prompt.length,
   });

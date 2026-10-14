@@ -61,6 +61,7 @@ function makeRes() {
 }
 
 const savedKey = process.env.NVIDIA_API_KEY;
+const savedImageKey = process.env.NVIDIA_IMAGE_API_KEY;
 const savedEndpoint = process.env.NVIDIA_IMAGE_ENDPOINT;
 const savedModel = process.env.NVIDIA_IMAGE_MODEL;
 process.env.NVIDIA_API_KEY = "test-nvidia-key";
@@ -75,6 +76,9 @@ globalThis.fetch = async (url, init) => {
     return new Response("404 page not found", { status: 404 });
   }
   if (String(url) === "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.2-klein-4b") {
+    return new Response(JSON.stringify({ artifacts: [{ base64: ONE_PIXEL_PNG }] }), { status: 200 });
+  }
+  if (String(url) === "https://ai.api.nvidia.com/v1/genai/stabilityai/stable-diffusion-3.5-large") {
     return new Response(JSON.stringify({ artifacts: [{ base64: ONE_PIXEL_PNG }] }), { status: 200 });
   }
   return new Response(JSON.stringify({
@@ -110,6 +114,19 @@ assert(res._status === 200, "image-edit returns 200");
 assert(capturedRequest.payload.image === "data:image/png;base64,abc", "sends input image");
 assert(capturedRequest.payload.mode === "img2img", "selects image-edit mode");
 
+console.log("[test] Stable Diffusion 3.5 Large sends the hosted NIM request schema");
+process.env.NVIDIA_IMAGE_ENDPOINT = "https://ai.api.nvidia.com/v1/genai/stabilityai/stable-diffusion-3.5-large";
+process.env.NVIDIA_IMAGE_MODEL = "stabilityai/stable-diffusion-3.5-large";
+res = makeRes();
+await handler(makeReq("POST", { prompt: "a tree at sunset", width: 768, height: 1344, steps: 32, seed: 7 }), res);
+assert(res._status === 200, "Stable Diffusion 3.5 Large returns 200");
+assert(capturedRequest.url === process.env.NVIDIA_IMAGE_ENDPOINT, "calls the hosted Stable Diffusion 3.5 endpoint");
+assert(capturedRequest.payload.prompt === "a tree at sunset", "sends the image prompt");
+assert(capturedRequest.payload.mode === "base", "defaults to the base model mode");
+assert(capturedRequest.payload.width === 768 && capturedRequest.payload.height === 1344, "preserves a supported portrait resolution");
+assert(capturedRequest.payload.steps === 32 && capturedRequest.payload.seed === 7, "forwards bounded steps and seed");
+assert(!("model" in capturedRequest.payload), "does not send a model field to the model-specific NIM endpoint");
+
 console.log("[test] Qwen Image supports prompt-only text-to-image requests");
 process.env.NVIDIA_IMAGE_ENDPOINT = "https://integrate.api.nvidia.com/v1/images/generations";
 process.env.NVIDIA_IMAGE_MODEL = "qwen-image";
@@ -129,13 +146,16 @@ await handler(makeReq("POST", { prompt: "a tree at sunset", image: "data:image/p
 assert(res._status === 400, "rejects image input before calling NVIDIA");
 assert(res._json.status === "IMAGE_INPUT_NOT_SUPPORTED", "returns a structured unsupported-image status");
 
-console.log("[test] NVIDIA missing configuration returns 503");
+console.log("[test] NVIDIA missing credentials returns 503");
+delete process.env.NVIDIA_API_KEY;
+delete process.env.NVIDIA_IMAGE_API_KEY;
 delete process.env.NVIDIA_IMAGE_ENDPOINT;
 res = makeRes();
 await handler(makeReq("POST", { prompt: "a cat" }), res);
-assert(res._status === 503, "returns 503 without endpoint");
+assert(res._status === 503, "returns 503 without credentials");
 assert(res._json.status === "CONFIGURATION_ERROR", "returns structured configuration error");
 process.env.NVIDIA_IMAGE_ENDPOINT = savedEndpoint || "https://nvidia.example.test/image";
+process.env.NVIDIA_API_KEY = "test-nvidia-key";
 
 console.log("[test] invalid method returns 405");
 res = makeRes();
@@ -145,6 +165,8 @@ assert(res._status === 405, "returns 405 for GET");
 globalThis.fetch = originalFetch;
 if (savedKey === undefined) delete process.env.NVIDIA_API_KEY;
 else process.env.NVIDIA_API_KEY = savedKey;
+if (savedImageKey === undefined) delete process.env.NVIDIA_IMAGE_API_KEY;
+else process.env.NVIDIA_IMAGE_API_KEY = savedImageKey;
 if (savedEndpoint === undefined) delete process.env.NVIDIA_IMAGE_ENDPOINT;
 else process.env.NVIDIA_IMAGE_ENDPOINT = savedEndpoint;
 if (savedModel === undefined) delete process.env.NVIDIA_IMAGE_MODEL;
