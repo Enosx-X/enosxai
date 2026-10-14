@@ -136,7 +136,8 @@ Existing pre-Firebase chats are not automatically copied into a signed-in accoun
 
 **AI Services**:
 - `NVIDIA_API_KEY` — NVIDIA's OpenAI-compatible API for chat
-- `NVIDIA_MODE` — Model selection (e.g., `meta/llama-3.1-70b`)
+- EX Pro and ENOSH MIND use NVIDIA `moonshotai/kimi-k3` for text chat by default; set `NVIDIA_EX_PRO_MODEL`, `NVIDIA_ENOSH_MIND_MODEL`, or shared `NVIDIA_KIMI_MODEL` to override server-side.
+- `NVIDIA_MODEL` and `NVIDIA_EX_CORE_MODEL` — Optional EX Core text model configuration
 - `NVIDIA_IMAGE_API_KEY` — Optional image-provider key; falls back to `NVIDIA_API_KEY`
 - `NVIDIA_IMAGE_ENDPOINT` — Required URL for a deployed Stable Diffusion 3.5 Large NIM endpoint
 - `NVIDIA_IMAGE_MODEL` — Optional model identifier; defaults to Stable Diffusion 3.5 Large for model-specific `/v1/infer` endpoints

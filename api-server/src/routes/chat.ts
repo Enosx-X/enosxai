@@ -8,11 +8,11 @@ const MODE_MODELS: Record<string, { text: string; vision: string }> = {
     vision: process.env.NVIDIA_EX_CORE_VISION_MODEL || process.env.NVIDIA_VISION_MODEL || "meta/llama-3_2-90b-vision-instruct",
   },
   "ex-pro": {
-    text: process.env.NVIDIA_EX_PRO_MODEL || process.env.NVIDIA_MODEL || "openai/gpt-oss-20b",
+    text: process.env.NVIDIA_EX_PRO_MODEL || process.env.NVIDIA_KIMI_MODEL || "moonshotai/kimi-k3",
     vision: process.env.NVIDIA_EX_PRO_VISION_MODEL || process.env.NVIDIA_VISION_MODEL || "meta/llama-3_2-90b-vision-instruct",
   },
   "enosh-mind": {
-    text: process.env.NVIDIA_ENOSH_MIND_MODEL || process.env.NVIDIA_MODEL || "openai/gpt-oss-20b",
+    text: process.env.NVIDIA_ENOSH_MIND_MODEL || process.env.NVIDIA_KIMI_MODEL || "moonshotai/kimi-k3",
     vision: process.env.NVIDIA_ENOSH_MIND_VISION_MODEL || process.env.NVIDIA_VISION_MODEL || "meta/llama-3_2-90b-vision-instruct",
   },
 };
