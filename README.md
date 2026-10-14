@@ -143,6 +143,9 @@ Existing pre-Firebase chats are not automatically copied into a signed-in accoun
 
 Image provider keys must remain server-side and must not use a `VITE_` prefix. Stable Diffusion 3.5 Large is subject to NVIDIA's API trial terms and Stability AI's model terms; review the model's license before commercial use.
 
+**Online media search**:
+- `SERPER_API_KEY` — (Optional) server-only Serper.dev key for searching online images and videos. Add it to the Vercel project's environment variables; do not use a `VITE_` prefix. Without it, regular chat continues to work and media search is simply unavailable.
+
 **Voice**:
 - `ELEVEN_LABS_API_KEY` — ElevenLabs API key (stored as encrypted secret)
 - `ELEVEN_LABS_VOICE_ID` — (Optional) Custom voice ID

@@ -91,12 +91,50 @@ const generateTitle = (firstMessage: string): string => {
 };
 
 function isImageGenerationRequest(text: string): boolean {
-  return /\b(?:generate|create|make|draw|paint|render|illustrate|design)\b.{0,120}\b(?:image|picture|illustration|artwork|logo|icon|avatar)\b/i.test(text)
-    || /\b(?:show|give|send|display)\b.{0,80}\b(?:an?\s+)?(?:image|picture|illustration|artwork|logo|icon|avatar)\b/i.test(text);
+  if (/\b(?:online|internet|web)\b/i.test(text) && /\b(?:image|picture|photo|video|clip|movie)s?\b/i.test(text)) return false;
+  return /\b(?:generate|create|make|draw|paint|render|illustrate|design)\b.{0,120}\b(?:image|picture|illustration|artwork|logo|icon|avatar)\b/i.test(text);
 }
 
 function isImageEditRequest(text: string): boolean {
   return /\b(?:edit|modify|transform|restyle|retouch|recolor|recolour|replace|remove|add|change|enhance|improve|reimagine|adjust|crop|upscale|make)\b/i.test(text);
+}
+
+function getOnlineMediaSearch(text: string): { type: "images" | "videos"; query: string } | null {
+  if (isImageGenerationRequest(text)) return null;
+  if (!/\b(?:online|internet|web|search|find|show|display|look\s+up)\b/i.test(text)) return null;
+  const type = /\b(?:video|videos|clip|clips|movie|movies)\b/i.test(text) ? "videos"
+    : /\b(?:image|images|picture|pictures|photo|photos)\b/i.test(text) ? "images"
+      : null;
+  if (!type) return null;
+  const query = text
+    .replace(/\b(?:please|online|on\s+the\s+internet|from\s+the\s+web|from\s+online|search\s+(?:for|the\s+web\s+for)|find|show|display|look\s+up|me|some|images?|pictures?|photos?|videos?|clips?|movies?)\b/gi, " ")
+    .replace(/[?!.,]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return { type, query: (query || text).slice(0, 240) };
+}
+
+async function searchOnlineMedia(query: string, type: "images" | "videos"): Promise<string> {
+  try {
+    const response = await fetch("/api/media-search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, type }),
+    });
+    if (!response.ok) return "";
+    const payload = await response.json() as { results?: Array<{ title?: string; url?: string; imageUrl?: string; source?: string }> };
+    const results = Array.isArray(payload.results) ? payload.results : [];
+    const lines = results.flatMap((item) => {
+      const mediaUrl = type === "images" ? item.imageUrl || item.url : item.url;
+      if (!mediaUrl || !/^https?:\/\//i.test(mediaUrl)) return [];
+      const title = (item.title || (type === "images" ? "Online image" : "Online video")).replace(/[\r\n\[\]]/g, " ").slice(0, 150);
+      const source = item.source ? ` — ${item.source.replace(/[\r\n]/g, " ").slice(0, 80)}` : "";
+      return [type === "images" ? `![${title}](${mediaUrl})\n[Source: ${title}${source}](${item.url || mediaUrl})` : `[${title}${source}](${mediaUrl})`];
+    });
+    return lines.length ? `### Verified online ${type} results\n${lines.join("\n\n")}` : "";
+  } catch {
+    return "";
+  }
 }
 
 function normalizeConversation(raw: any): Conversation | null {
@@ -670,6 +708,10 @@ export default function ChatPage() {
       const connectorContext = selectedConnectorNames.length
         ? `### Selected Connectors\nThe user selected these connector services for this chat: ${selectedConnectorNames.join(", ")}. Treat them as requested context. Use a connector only when its capability is actually available to the runtime; if it is not connected, state that clearly instead of claiming an external action was completed.`
         : "";
+      const mediaSearchRequest = getOnlineMediaSearch(userMessage.content);
+      const onlineMediaContext = mediaSearchRequest
+        ? await searchOnlineMedia(mediaSearchRequest.query, mediaSearchRequest.type)
+        : "";
 
       // ── SYSTEM PROMPT CONSTRUCTION ──────────────────────────────────────────────
       const identity = getAIIdentity();
@@ -712,6 +754,9 @@ ${companyFaqs}
 ${githubContext}
 
 ${connectorContext}
+
+### Online media results
+${onlineMediaContext ? `${onlineMediaContext}\nUse these exact results in the answer: show image results with the supplied Markdown image syntax and show video results as concise clickable links. Do not change the URLs or invent additional media.` : "No online media search was run for this request, or no results are configured. Do not claim to have searched."}
 
 ### Connector Privacy and Access
 - Never inspect, query, or use a connected connector unless the user explicitly selected it for this prompt.
