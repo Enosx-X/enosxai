@@ -367,6 +367,7 @@ export default function ChatPage() {
   const {
     voiceState,
     transcript,
+    microphoneStream,
     isSupported: isVoiceSupported,
     startListening,
     stopListening,
@@ -391,6 +392,14 @@ export default function ChatPage() {
   const { activeWindow } = useActiveWindow();
   const { enrichMessageWithContext } = useContextAwareMessages();
   const { fileContext, getFileContextMessage, clearFiles, loadFile, removeFile } = useFileContext();
+  const monitoringSnapshot = {
+    totalMessages: analytics.totalMessages,
+    totalConversations: analytics.totalConversations,
+    voiceUsageCount: analytics.voiceUsageCount,
+    isListening: voiceState === "listening",
+    isProcessing: isLoading,
+    filesInContext: fileContext.files.length,
+  };
   const { getMemoryContext, addMemory } = useMemoryBank();
   const { getSkillContext, getKnowledgeContext, addEntry } = useKnowledgeBank();
   const { parseActions } = useSystemActions();
@@ -953,6 +962,7 @@ ${getAdminContext()}` : ""}`,
           isFreeMode={isFreeMode}
           onFilesSelected={handleFilesSelected}
           attachments={fileContext.files}
+          audioStream={microphoneStream}
         />
       </GlobalLayout>
     );
@@ -987,6 +997,8 @@ ${getAdminContext()}` : ""}`,
           isFreeMode={isFreeMode}
           onFilesSelected={handleFilesSelected}
           attachments={fileContext.files}
+          audioStream={microphoneStream}
+          monitoring={monitoringSnapshot}
           onSettingsClick={() => setShowProfilePanel(true)}
         />
       </GlobalLayout>
@@ -1099,9 +1111,10 @@ ${getAdminContext()}` : ""}`,
         >
           <AnimatePresence mode="wait">
             {!activeConversation || activeConversation.messages.length === 0 ? (
-              <WelcomeScreen 
-                key="welcome" 
+              <WelcomeScreen
+                key="welcome"
                 onSuggestion={(text) => void handleSendTracked(text)}
+                monitoring={monitoringSnapshot}
               />
             ) : (
               <motion.div 
@@ -1181,6 +1194,7 @@ ${getAdminContext()}` : ""}`,
               isFreeMode={isFreeMode}
               onFilesSelected={handleFilesSelected}
               attachments={fileContext.files}
+              audioStream={microphoneStream}
             />
           </div>
         </div>

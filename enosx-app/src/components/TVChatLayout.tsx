@@ -25,6 +25,7 @@ interface TVChatLayoutProps {
   isFreeMode?: boolean;
   onFilesSelected?: (files: File[]) => void;
   attachments?: Attachment[];
+  audioStream?: MediaStream | null;
 }
 
 export default function TVChatLayout({
@@ -46,6 +47,7 @@ export default function TVChatLayout({
   isFreeMode = false,
   onFilesSelected,
   attachments = [],
+  audioStream = null,
 }: TVChatLayoutProps) {
   const { config } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -171,6 +173,7 @@ export default function TVChatLayout({
           isFreeMode={isFreeMode}
           onFilesSelected={onFilesSelected}
           attachments={attachments}
+          audioStream={audioStream}
         />
       </div>
     </div>

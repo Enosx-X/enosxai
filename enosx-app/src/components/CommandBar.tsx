@@ -66,6 +66,7 @@ interface CommandBarProps {
   onSend: (text: string, aiMode?: AIMode, selectedConnectorIds?: string[]) => void;
   isLoading: boolean;
   voiceState: VoiceState;
+  audioStream?: MediaStream | null;
   transcript: string;
   isVoiceSupported: boolean;
   onStartVoice: () => void;
@@ -81,6 +82,7 @@ export default function CommandBar({
   onSend,
   isLoading,
   voiceState,
+  audioStream = null,
   transcript,
   isVoiceSupported,
   onStartVoice,
@@ -503,6 +505,27 @@ export default function CommandBar({
                   )}
                 </motion.button>
               </div>
+              <AnimatePresence initial={false}>
+                {isListening && (
+                  <motion.div
+                    key="voice-waveform"
+                    data-testid="voice-waveform-panel"
+                    initial={{ height: 0, opacity: 0, y: -4 }}
+                    animate={{ height: 44, opacity: 1, y: 0 }}
+                    exit={{ height: 0, opacity: 0, y: -4 }}
+                    transition={{ duration: 0.18 }}
+                    className="overflow-hidden"
+                  >
+                    <VoiceVisualizer
+                      isActive={isListening}
+                      isListening={isListening}
+                      color={config.accent}
+                      accentRgb={config.accentRgb}
+                      audioStream={audioStream}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </motion.div>
         </motion.div>

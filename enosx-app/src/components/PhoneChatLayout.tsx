@@ -4,7 +4,7 @@ import { Menu, Plus } from "lucide-react";
 import Sidebar from "./Sidebar";
 import MessageBubble from "./MessageBubble";
 import CommandBar, { type AIMode } from "./CommandBar";
-import WelcomeScreen from "./WelcomeScreen";
+import WelcomeScreen, { type MonitoringSnapshot } from "./WelcomeScreen";
 import { Conversation, Message, VoiceState, type Attachment } from "@/lib/types";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -30,6 +30,8 @@ interface PhoneChatLayoutProps {
   isFreeMode?: boolean;
   onFilesSelected?: (files: File[]) => void;
   attachments?: Attachment[];
+  audioStream?: MediaStream | null;
+  monitoring?: MonitoringSnapshot;
   onSettingsClick?: () => void;
 }
 
@@ -55,6 +57,8 @@ export default function PhoneChatLayout({
   isFreeMode = false,
   onFilesSelected,
   attachments = [],
+  audioStream = null,
+  monitoring,
   onSettingsClick,
 }: PhoneChatLayoutProps) {
   const { config } = useTheme();
@@ -85,7 +89,7 @@ export default function PhoneChatLayout({
       {/* Main Content Area */}
       <main className="flex-1 min-h-0 overflow-y-auto relative z-10 px-4 py-4 scrollbar-hide">
         {messages.length === 0 ? (
-          <WelcomeScreen onSuggestion={(p: string) => handleSend(p)} />
+          <WelcomeScreen onSuggestion={(p: string) => handleSend(p)} monitoring={monitoring} />
         ) : (
           <div className="flex flex-col gap-6 pb-32">
             {messages.map((msg, idx) => (
@@ -117,6 +121,7 @@ export default function PhoneChatLayout({
           isFreeMode={isFreeMode}
           onFilesSelected={onFilesSelected}
           attachments={attachments}
+          audioStream={audioStream}
         />
       </div>
 

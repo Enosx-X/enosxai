@@ -143,6 +143,8 @@ function getRecognitionErrorMessage(error: string) {
 export function useVoice() {
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [transcript, setTranscript] = useState("");
+  const [microphoneStream, setMicrophoneStream] = useState<MediaStream | null>(null);
+  const microphoneStreamRef = useRef<MediaStream | null>(null);
   const [settings, setSettings] = useState<SpeechSettings>(() => loadSpeechSettings());
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -189,16 +191,28 @@ export function useVoice() {
     setVoiceState("idle");
   }, [releaseAudio]);
 
+  const releaseMicrophone = useCallback(() => {
+    microphoneStreamRef.current?.getTracks().forEach((track) => track.stop());
+    microphoneStreamRef.current = null;
+    setMicrophoneStream(null);
+  }, []);
+
   const stopListening = useCallback(() => {
     const recognition = recognitionRef.current;
-    if (!recognition) return;
-
-    try {
-      recognition.stop();
-    } catch {
-      recognitionRef.current = null;
-      setVoiceState("idle");
+    if (recognition) {
+      try {
+        recognition.stop();
+      } catch {
+        recognitionRef.current = null;
+        setVoiceState("idle");
+      }
     }
+    releaseMicrophone();
+  }, [releaseMicrophone]);
+
+  useEffect(() => () => {
+    microphoneStreamRef.current?.getTracks().forEach((track) => track.stop());
+    recognitionRef.current?.stop();
   }, []);
 
   const startListening = useCallback(
@@ -228,7 +242,8 @@ export function useVoice() {
             autoGainControl: true,
           },
         });
-        stream.getTracks().forEach((track) => track.stop());
+        microphoneStreamRef.current = stream;
+        setMicrophoneStream(stream);
       } catch (error) {
         const name = error instanceof DOMException ? error.name : "";
         const message =
@@ -237,6 +252,7 @@ export function useVoice() {
             : name === "NotFoundError"
               ? "No microphone was found. Check that a microphone is connected and available."
               : "We could not access your microphone. Check your browser permission and try again.";
+        releaseMicrophone();
         showError(message);
         setVoiceState("idle");
         return;
@@ -252,6 +268,7 @@ export function useVoice() {
         }).webkitSpeechRecognition;
 
       if (!SpeechRecognitionAPI) {
+        releaseMicrophone();
         showError("Voice input is not available in this browser.");
         return;
       }
@@ -311,6 +328,7 @@ export function useVoice() {
       recognition.onerror = (event) => {
         if (recognitionRef.current !== recognition) return;
         recognitionRef.current = null;
+        releaseMicrophone();
         setVoiceState("idle");
         showError(getRecognitionErrorMessage(event.error));
       };
@@ -318,6 +336,7 @@ export function useVoice() {
       recognition.onend = () => {
         if (recognitionRef.current !== recognition) return;
         recognitionRef.current = null;
+        releaseMicrophone();
         setVoiceState("idle");
       };
 
@@ -326,12 +345,13 @@ export function useVoice() {
         recognition.start();
       } catch (error) {
         recognitionRef.current = null;
+        releaseMicrophone();
         setVoiceState("idle");
         console.error("Speech recognition could not start", error);
         showError("Voice input could not start. Please try again.");
       }
     },
-    [isSupported, stopListening]
+    [isSupported, stopListening, releaseMicrophone]
   );
 
   /**
@@ -453,6 +473,7 @@ export function useVoice() {
   return {
     voiceState,
     transcript,
+    microphoneStream,
     isSupported,
     startListening,
     stopListening,

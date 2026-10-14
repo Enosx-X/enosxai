@@ -1,3 +1,10 @@
+## v0.1.25 — Voice, Monitoring & Release QA
+
+- Added real-time microphone waveform visualization to the composer, sharing the active microphone stream with speech recognition.
+- Added a live monitoring dashboard to the main welcome view with message, conversation, voice, file-context, and assistant-status widgets.
+- Added persisted widget visibility and ordering controls for dashboard customization.
+- Added Playwright UI regression tests to CI and made the desktop release workflow gate release asset publishing on UI tests, type checking, and a production build.
+
 ## v0.1.23 — Engineering expertise & token usage
 
 - Added chemical-engineering and thermodynamics guidance, including balance closure, model assumptions, property methods, and process-safety cautions.

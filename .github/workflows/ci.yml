@@ -27,6 +27,10 @@ jobs:
 
       - name: Typecheck enosx-app
         run: pnpm --filter @workspace/enosx-app typecheck || pnpm --filter @enosx/app typecheck || pnpm -r typecheck
+      - name: Install Playwright Chromium
+        run: pnpm --filter @workspace/enosx-app exec playwright install --with-deps chromium
+      - name: Run UI regression suite
+        run: pnpm --filter @workspace/enosx-app test:e2e
 
       - name: Typecheck exlover
         run: pnpm --filter @enosx/exlover typecheck || true
