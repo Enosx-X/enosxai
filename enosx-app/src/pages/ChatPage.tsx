@@ -61,7 +61,7 @@ import { WORKSPACE_DIRECTIVES } from "@/lib/workspaceDirectives";
 import { useCommandChain, type SystemAction } from "@/hooks/useCommandChain";
 import { deleteConversation as deleteCloudConversation, loadConversations, saveConversation } from "@/lib/firebaseStorage";
 import { ComputerWorkspaceProvider, useComputerWorkspace } from "@/contexts/ComputerWorkspaceContext";
-import { ChevronDown, Copy, Menu, Share2 } from "lucide-react";
+import { ChevronDown, Copy, Gauge, Menu, Share2 } from "lucide-react";
 import { copyTranscript } from "@/lib/shareConversation";
 import { useScriptRuntime, type ScriptLanguage } from "@/hooks/useScriptRuntime";
 import {
@@ -395,7 +395,7 @@ export default function ChatPage() {
     onFinalResultRef,
   } = useVoice();
 
-  const { recordOutgoingMessage, recordVoiceUsage, refreshFromConversations } = useAnalytics();
+  const { analytics, recordOutgoingMessage, recordTokenUsage, recordVoiceUsage, refreshFromConversations } = useAnalytics();
   const conversationSearch = useConversationSearch();
   const { getAdminContext } = useAdminConsole();
 
@@ -881,7 +881,13 @@ ${getAdminContext()}` : ""}`,
             }
           }
         },
-        { githubContext, aiMode, skillContext, attachments: userMessage.attachments },
+        {
+          githubContext,
+          aiMode,
+          skillContext,
+          attachments: userMessage.attachments,
+          onTokenUsage: ({ totalTokens }) => recordTokenUsage(totalTokens),
+        },
         updateReasoningStatus
       );
 
@@ -1194,6 +1200,16 @@ ${getAdminContext()}` : ""}`,
           </div>
 
           <div className="flex items-center gap-3">
+            <div
+              role="status"
+              aria-label={`${analytics.totalTokensUsed.toLocaleString()} tokens used`}
+              title="Lifetime tokens used in this browser. Provider-reported counts are used when available; otherwise the app estimates from text length. No usage limit is shown."
+              className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[11px] font-medium text-white/65"
+            >
+              <Gauge size={13} className="text-cyan-300" />
+              <span>{analytics.totalTokensUsed.toLocaleString()}</span>
+              <span className="hidden sm:inline">tokens</span>
+            </div>
             <div className="hidden items-center gap-1 sm:flex" aria-label="Conversation actions">
               <button type="button" onClick={() => void handleShareConversation()} disabled={!activeConversation?.messages.length} title="Share conversation" aria-label="Share conversation" className="rounded-full border border-white/10 p-2 text-white/65 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"><Share2 size={14} /></button>
               <button type="button" onClick={() => void handleCopyConversation()} disabled={!activeConversation?.messages.length} title="Copy conversation" aria-label="Copy conversation" className="rounded-full border border-white/10 p-2 text-white/65 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"><Copy size={14} /></button>

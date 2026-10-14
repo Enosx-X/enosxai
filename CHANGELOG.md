@@ -1,3 +1,9 @@
+## v0.1.23 — Engineering expertise & token usage
+
+- Added chemical-engineering and thermodynamics guidance, including balance closure, model assumptions, property methods, and process-safety cautions.
+- Expanded complex AC analysis expectations and added a reproducible multi-branch phasor regression prompt with reference values.
+- Added a lifetime token-used counter to the chat header and insights dashboard; use provider-reported usage when available and clearly fall back to a text-based estimate without showing a usage cap.
+
 ## v0.1.22 — Faster hosted image generation
 
 - Route NVIDIA's retired hosted Qwen text-image endpoint directly to FLUX.2 Klein, avoiding a slow, guaranteed 404 request before the existing fallback.
