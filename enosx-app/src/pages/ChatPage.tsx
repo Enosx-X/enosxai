@@ -55,15 +55,9 @@ import { getSystemPrompt } from "@/lib/prompts";
 import { CONNECTOR_CATALOG } from "@/lib/connectorCatalog";
 import LeadCaptureDialog from "@/components/LeadCaptureDialog";
 import AdminConsoleDialog from "@/components/AdminConsoleDialog";
-import ChatSplitLayout from "@/components/ChatSplitLayout";
-import { getSplitEnabled, setSplitEnabled, onSplitPrefChange, notifySplitPrefChanged } from "@/lib/splitPref";
-import { WORKSPACE_DIRECTIVES } from "@/lib/workspaceDirectives";
-import { useCommandChain, type SystemAction } from "@/hooks/useCommandChain";
 import { deleteConversation as deleteCloudConversation, loadConversations, saveConversation } from "@/lib/firebaseStorage";
-import { ComputerWorkspaceProvider, useComputerWorkspace } from "@/contexts/ComputerWorkspaceContext";
 import { ChevronDown, Copy, Gauge, Menu, Share2 } from "lucide-react";
 import { copyTranscript } from "@/lib/shareConversation";
-import { useScriptRuntime, type ScriptLanguage } from "@/hooks/useScriptRuntime";
 import {
   getNotificationPermission,
   requestEnosxNotificationPermission,
@@ -160,18 +154,6 @@ function normalizeConversation(raw: any): Conversation | null {
 
 const ACTION_BLOCK = /\[\[ACTION:\s*({[\s\S]*?})\s*\]\]/g;
 
-// Chat-page mapping of AI app names to workspace app ids (mirrors the workspace
-// page so proposed actions like "Launch terminal" open the right window).
-function mapWorkspaceAppId(appName: string): "browser" | "github" | "files" | "terminal" | "settings" | null {
-  const normalized = String(appName || "").toLowerCase().trim();
-  if (["browser", "chrome", "edge", "globe", "web"].includes(normalized)) return "browser";
-  if (["github", "git", "code"].includes(normalized)) return "github";
-  if (["terminal", "console", "cmd", "powershell", "shell", "bash"].includes(normalized)) return "terminal";
-  if (["files", "file", "folder", "explorer", "notepad", "calculator", "vscode"].includes(normalized)) return "files";
-  if (["settings", "config"].includes(normalized)) return "settings";
-  return null;
-}
-
 function removeActionBlocks(content: string) {
   return content.replace(ACTION_BLOCK, "").replace(/\n{3,}/g, "\n\n").trim();
 }
@@ -252,40 +234,6 @@ async function loadGitHubConnectorContext(): Promise<string> {
     const message = error instanceof Error ? error.message : "unknown GitHub error";
     return `GitHub was selected, but its repository context could not be loaded: ${message}. Do not claim that GitHub content was inspected.`;
   }
-}
-
-function extractLiveCodePreview(content: string): { language: ScriptLanguage; name: string; content: string } | null {
-  const matches = [...content.matchAll(/```([a-zA-Z0-9+#_-]*)\s*\n([\s\S]*?)(?:```|$)/g)];
-  const latest = matches.at(-1);
-  if (!latest?.[2]?.trim() || latest[2].trim().length < 8) return null;
-
-  const rawLanguage = (latest[1] || "").toLowerCase();
-  const language: ScriptLanguage = rawLanguage === "sh" || rawLanguage === "bash" || rawLanguage === "shell"
-    ? "shell"
-    : rawLanguage === "bat" || rawLanguage === "batch" || rawLanguage === "cmd"
-      ? "batch"
-      : "python";
-  const extension = language === "python" ? "py" : language === "shell" ? "sh" : "bat";
-  return { language, name: `enosx-live-preview.${extension}`, content: latest[2] };
-}
-
-function parseWorkspaceActions(text: string): SystemAction[] {
-  const actions: SystemAction[] = [];
-  const regex = /\[\[ACTION:\s*({.*?})\s*\]\]/g;
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    try {
-      const action = JSON.parse(match[1]) as SystemAction;
-      if (
-        ["open_url", "launch_app", "read_webpage", "extract_links", "click_element", "fill_form", "chain", "delay", "create_script", "run_script"].includes(action.type)
-      ) {
-        actions.push(action);
-      }
-    } catch {
-      /* ignore malformed blocks */
-    }
-  }
-  return actions;
 }
 
 export default function ChatPage() {
@@ -412,10 +360,7 @@ export default function ChatPage() {
 
   const { sendMessage, isLoading: isChatLoading, isThinking, error: chatError, isFreeMode } = useAI();
   const { generateImage, isGenerating, error: imageError, clearError: clearImageError } = useImageGeneration();
-  const { createScript, updateScript, deleteScript } = useScriptRuntime();
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">(() => getNotificationPermission());
-  const liveDraftIdRef = useRef<string | null>(null);
-  const liveCodingNotifiedRef = useRef(false);
   const isLoading = isChatLoading || isGenerating;
   const error = chatError || imageError;
 
@@ -488,12 +433,6 @@ export default function ChatPage() {
   }, [fileContext.files.length, handleFileUpload]);
 
   const [isGodModeActive, setIsGodModeActive] = useState(false);
-  // Standalone split-screen toggle (shared with /workspace via localStorage).
-  const [chatSplitEnabled, setChatSplitEnabled] = useState<boolean>(() => getSplitEnabled());
-  useEffect(() => {
-    const unsub = onSplitPrefChange(() => setChatSplitEnabled(getSplitEnabled()));
-    return unsub;
-  }, []);
   const [showGodModeWarning, setShowGodModeWarning] = useState(false);
   const [showGodTerminal, setShowGodTerminal] = useState(false);
   const [showEthicalHackingQuiz, setShowEthicalHackingQuiz] = useState(false);
@@ -715,9 +654,6 @@ export default function ChatPage() {
 
       // ── SYSTEM PROMPT CONSTRUCTION ──────────────────────────────────────────────
       const identity = getAIIdentity();
-      // Workspace mode: when the split-screen computer pane is visible, teach the
-      // AI to emit [[ACTION: ...]] blocks so its coding runs live in the pane.
-      const workspaceDirectives = chatSplitEnabled && deviceType === "desktop" ? `\n\n${WORKSPACE_DIRECTIVES}` : "";
       const memoryContext = getMemoryContext(userMessage.content);
       const skillContext = getSkillContext(userMessage.content);
       const knowledgeContext = getKnowledgeContext(userMessage.content);
@@ -776,7 +712,7 @@ ${onlineMediaContext ? `${onlineMediaContext}\nUse these exact results in the an
 - Identify potential bugs before they occur
 - Recommend appropriate abstractions and refactoring opportunities
 
-Current System Status: ONLINE${workspaceDirectives}
+Current System Status: ONLINE
 ${memoryContext}
 ${knowledgeContext}
 ${getAdminContext().trim() ? `
@@ -784,7 +720,6 @@ ${getAdminContext().trim() ? `
 ${getAdminContext()}` : ""}`,
         timestamp: new Date(),
       };
-
 
       // Enrich history with app context and system identity
       let enrichedMessages = [systemPrompt, ...history, userMessage];
@@ -826,73 +761,12 @@ ${getAdminContext()}` : ""}`,
           pendingRenderChunk += chunk;
           queueStreamRender();
 
-          const livePreview = extractLiveCodePreview(streamedContent);
-          if (livePreview) {
-            if (!chatSplitEnabledRef.current) {
-              setSplitEnabled(true);
-              notifySplitPrefChanged();
-              setChatSplitEnabled(true);
-              toast.info("Live coding detected — opening the split workspace automatically");
-            }
-            if (!liveCodingNotifiedRef.current) {
-              liveCodingNotifiedRef.current = true;
-              sendEnosxNotification({
-                title: "ENOSX AI is writing code",
-                body: "The live coding workspace has opened so you can watch the code appear.",
-                tag: "enosx-live-coding",
-                data: { url: window.location.href },
-              });
-            }
-            if (!liveDraftIdRef.current) {
-              liveDraftIdRef.current = createScript(livePreview.name, livePreview.language, livePreview.content).id;
-            } else {
-              updateScript(liveDraftIdRef.current, livePreview.content);
-            }
-          }
-
         },
         () => {
           // Apply the final buffered chunk before cleaning the streamed reply.
           flushStreamToChat();
           const proposedActions = parseActions(streamedContent) as AssistantAction[];
           const cleanContent = removeActionBlocks(streamedContent);
-          // Workspace mode: execute the AI's actions automatically in the computer pane.
-          const actions = parseWorkspaceActions(streamedContent);
-          if (liveDraftIdRef.current && actions.some((action) => action.type === "create_script" || action.type === "run_script")) {
-            deleteScript(liveDraftIdRef.current);
-            liveDraftIdRef.current = null;
-          }
-          if (liveCodingNotifiedRef.current) {
-            sendEnosxNotification({
-              title: "ENOSX AI finished writing code",
-              body: "The generated code is ready in the live workspace.",
-              tag: "enosx-live-coding-complete",
-              data: { url: window.location.href },
-            });
-            liveCodingNotifiedRef.current = false;
-          }
-          // Also auto-run any review-free proposed actions (e.g. "Launch terminal") so
-          // the AI's coding shows up live even when the model skips [[ACTION: ...]] blocks.
-          for (const pa of proposedActions) {
-            // Convert chat proposed actions into workspace SystemActions so they
-            // run automatically in the computer pane when split is on.
-            if (pa.type === "launch_app" && pa.app) {
-              const mapped = mapWorkspaceAppId(pa.app);
-              if (mapped) {
-                (window as any).__chatOpenWorkspaceWindow?.(mapped);
-                toast.success(`Opened ${pa.app} in the workspace`);
-              } else {
-                toast.info(`"${pa.app}" isn't a workspace app — opening it in a new tab instead.`);
-              }
-            } else if (pa.type === "open_url" && pa.url) {
-              actions.push({ type: "open_url", url: pa.url } as SystemAction);
-            } else if ((pa.type === "read_webpage" || pa.type === "extract_links") && pa.url) {
-              actions.push({ type: pa.type, url: pa.url } as SystemAction);
-            } else if (pa.type === "delay") {
-              actions.push({ type: "delay", ms: pa.delay ?? 500 } as SystemAction);
-            }
-          }
-          (window as any).__chatExecuteWorkspaceActions?.(actions);
           setConversations((prev) =>
             prev.map((conversation) =>
               conversation.id === targetConvId
@@ -942,7 +816,7 @@ ${getAdminContext()}` : ""}`,
         sendingRef.current = false;
       }
     },
-    [sendMessage, speak, autoSpeak, user, fileContext.isLoaded, getFileContextMessage, getMemoryContext, getSkillContext, getKnowledgeContext, addMemory, addEntry, enrichMessageWithContext, activeWindow, clearFiles, parseActions, speechSettings.continuousConversation, scheduleListenAgain, createScript, updateScript, deleteScript]
+    [sendMessage, speak, autoSpeak, user, fileContext.isLoaded, getFileContextMessage, getMemoryContext, getSkillContext, getKnowledgeContext, addMemory, addEntry, enrichMessageWithContext, activeWindow, clearFiles, parseActions, speechSettings.continuousConversation, scheduleListenAgain]
   );
 
   const createNewChat = useCallback(() => {
@@ -1053,14 +927,6 @@ ${getAdminContext()}` : ""}`,
     toast[copied ? "success" : "error"](copied ? "Conversation copied to your clipboard" : "Could not copy this conversation");
   }, [activeConversation]);
 
-  // Keep workspace hooks unconditional: phone and TV layouts return early, so
-  // every render must execute the same hooks in the same order.
-  const { executeChain } = useCommandChain();
-  const chatSplitEnabledRef = useRef(chatSplitEnabled);
-  useEffect(() => {
-    chatSplitEnabledRef.current = chatSplitEnabled;
-  }, [chatSplitEnabled]);
-
   if (deviceType === "tv") {
     return (
       <GlobalLayout>
@@ -1125,53 +991,6 @@ ${getAdminContext()}` : ""}`,
         />
       </GlobalLayout>
     );
-  }
-
-  const wrapWithSplit = (content: React.ReactNode) =>
-    chatSplitEnabled ? <ChatSplitLayout>{content}</ChatSplitLayout> : content;
-
-  // ── Live coding in the computer pane ──────────────────────────────────────────
-  // The command chain is a module-level singleton, so any executor component in
-  // the tree can run actions into the SAME script store the terminal watches.
-
-  // This component lives inside the ComputerWorkspaceProvider (when split is on)
-  // and drives the pane: it runs the AI's actions automatically and opens the
-  // right apps so the coding is visible without any clicks.
-  function WorkspaceActionsController() {
-    const { openWindow, focusWindow } = useComputerWorkspace();
-    const handleWorkspaceActions = useCallback(
-      (actions: SystemAction[]) => {
-        if (!chatSplitEnabledRef.current || actions.length === 0) return;
-        const types = actions.map((a) => a.type);
-        const needsTerminal = types.some((t) => t === "create_script" || t === "run_script");
-        const needsBrowser = types.some((t) => t === "open_url" || t === "read_webpage" || t === "extract_links");
-        if (needsTerminal) focusWindow("terminal");
-        else if (needsBrowser) focusWindow("browser");
-        toast.info(`ENOSX is executing ${actions.length} action(s) in the computer pane...`);
-        void executeChain(actions);
-      },
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      [executeChain, focusWindow]
-    );
-    const handleWorkspaceActionsRef = useRef(handleWorkspaceActions);
-    useEffect(() => {
-      handleWorkspaceActionsRef.current = handleWorkspaceActions;
-    }, [handleWorkspaceActions]);
-
-    // Auto-open the terminal and browser so AI coding appears automatically.
-    useEffect(() => {
-      if (!chatSplitEnabledRef.current) return;
-      openWindow("terminal");
-      openWindow("browser");
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    // Expose the executor to the handleSend flow above via the same module-level
-    // singleton used elsewhere (last-write-wins is fine — the ref is always fresh).
-    (window as any).__chatExecuteWorkspaceActions = (actions: SystemAction[]) =>
-      handleWorkspaceActionsRef.current(actions);
-    (window as any).__chatOpenWorkspaceWindow = (appId: string) => openWindow(appId as any);
-    return null;
   }
 
   const chatBody = (
@@ -1371,21 +1190,9 @@ ${getAdminContext()}` : ""}`,
     </div>
   );
 
-  // Workspace-aware view: when split is on, the whole layout (chat + computer
-  // pane) lives inside a ComputerWorkspaceProvider so window actions from the
-  // AI's coding drive the pane, and a hidden controller runs those actions.
-  const workspaceBody = chatSplitEnabled ? (
-    <ComputerWorkspaceProvider>
-      <WorkspaceActionsController />
-      {wrapWithSplit(chatBody)}
-    </ComputerWorkspaceProvider>
-  ) : (
-    wrapWithSplit(chatBody)
-  );
-
   return (
     <GlobalLayout>
-      {workspaceBody}
+      {chatBody}
       {/* Floating dialogs and overlays live outside the split so they always render above it */}
       <EnosxOnboardingDialog
         isOpen={showEnosxOnboarding}

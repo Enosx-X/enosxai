@@ -28,7 +28,7 @@ export function reportClientError(error: unknown, source = "client", extraStack 
     stack,
     source: plainText(source, 80),
     path: plainText(window.location.pathname, 200),
-    appVersion: "0.1.23",
+    appVersion: "0.1.24",
     userAgent: plainText(window.navigator.userAgent, 300),
     occurredAt: new Date(now).toISOString(),
   };
