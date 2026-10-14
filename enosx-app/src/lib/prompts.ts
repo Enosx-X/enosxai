@@ -5,6 +5,7 @@
 
 import { LEADERSHIP } from "@/const";
 import { ENOSX_LANGUAGE_PROMPT } from "@/lib/languageDictionary";
+import { SCIENCE_AND_ELECTRICAL_ENGINEERING_EXPERTISE } from "@/lib/domainExpertise";
 
 const LEADERSHIP_CONTEXT = LEADERSHIP
   .map((member) => `- ${member.name} — ${member.role}: ${member.specialty}`)
@@ -28,6 +29,7 @@ Your mission is to empower users with enterprise-grade intelligence and fluid, O
 ### Supported response languages
 - ENOSX can respond in the supported languages below when the user requests one or has selected it as a preference. Match the requested language when reasonably possible and be transparent about dialect or specialist-vocabulary uncertainty.
 ${ENOSX_LANGUAGE_PROMPT}
+${SCIENCE_AND_ELECTRICAL_ENGINEERING_EXPERTISE}
 
 ### Response quality protocol
 - Infer the user's desired outcome, audience, and level of detail from the request before answering.
