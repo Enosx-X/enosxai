@@ -3,13 +3,13 @@
  * Generates images through the configured NVIDIA image endpoint. Credentials
  * remain server-side and the browser receives a self-contained data URL so
  * generated images remain downloadable after a chat is reloaded. The hosted
- * Stable Diffusion 3.5 Large handles the default prompt-to-image flow. Other
- * NVIDIA image endpoints remain configurable for existing deployments.
+ * Stable Diffusion 3.5 Large uses a configured, deployed NIM endpoint. NVIDIA's
+ * Build catalog currently lists the model as downloadable rather than hosted.
  *
  * Server-only environment variables:
  *   - NVIDIA_IMAGE_API_KEY (required for image generation; falls back to NVIDIA_API_KEY)
  *   - NVIDIA_API_KEY (legacy/shared fallback)
- *   - NVIDIA_IMAGE_ENDPOINT (optional; defaults to hosted Stable Diffusion 3.5 Large)
+ *   - NVIDIA_IMAGE_ENDPOINT (required; URL of the deployed NIM service)
  *   - NVIDIA_IMAGE_MODEL (optional; defaults to stabilityai/stable-diffusion-3.5-large)
  *
  * Request body:
@@ -25,6 +25,7 @@
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import sharp from "sharp";
+import { fetchNvidiaWithRetry } from "./retryFetch";
 
 const DEFAULT_PROMPT = "Create a polished image based on the supplied prompt.";
 const DEFAULT_WIDTH = 1024;
@@ -32,7 +33,6 @@ const DEFAULT_HEIGHT = 1024;
 const DEFAULT_DIFFUSION_STEPS = 20;
 const MAX_PROMPT_LENGTH = 800;
 const MAX_IMAGE_LENGTH = 8_000_000;
-const NVIDIA_HOSTED_SD35_ENDPOINT = "https://ai.api.nvidia.com/v1/genai/stabilityai/stable-diffusion-3.5-large";
 const NVIDIA_HOSTED_FLUX2_ENDPOINT = "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.2-klein-4b";
 
 function stableDiffusion35Dimensions(body: any) {
@@ -146,15 +146,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed", status: "METHOD_NOT_ALLOWED" });
   }
 
-  const apiKey = (process.env.NVIDIA_IMAGE_API_KEY || process.env.NVIDIA_API_KEY)?.trim();
   const configuredEndpoint = process.env.NVIDIA_IMAGE_ENDPOINT?.trim();
-  const endpoint = configuredEndpoint || NVIDIA_HOSTED_SD35_ENDPOINT;
-  if (!apiKey) {
+  if (!configuredEndpoint) {
     console.error("[IMAGE] NVIDIA image credentials are not configured.");
     return res.status(503).json({
-      error: "NVIDIA image generation is not configured on the server",
+      error: "Set NVIDIA_IMAGE_ENDPOINT to a deployed Stable Diffusion 3.5 Large NIM endpoint.",
       status: "CONFIGURATION_ERROR",
     });
+  }
+  const endpoint = configuredEndpoint;
+  const apiKey = (process.env.NVIDIA_IMAGE_API_KEY || process.env.NVIDIA_API_KEY)?.trim();
+  if (!apiKey) {
+    console.error("[IMAGE] NVIDIA image credentials are not configured.");
+    return res.status(503).json({ error: "NVIDIA image generation credentials are not configured on the server", status: "CONFIGURATION_ERROR" });
   }
 
   let body: any = {};
@@ -177,7 +181,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const image = typeof body.image === "string" ? body.image.trim() : "";
-  const model = process.env.NVIDIA_IMAGE_MODEL?.trim() || (configuredEndpoint ? "" : "stabilityai/stable-diffusion-3.5-large");
+  const model = process.env.NVIDIA_IMAGE_MODEL?.trim() || (/stabilityai\/stable-diffusion-3\.5-large|\/v1\/infer\/?$/i.test(endpoint) ? "stabilityai/stable-diffusion-3.5-large" : "");
   const usesStableDiffusion35 = /stabilityai\/stable-diffusion-3\.5-large\/?$/i.test(endpoint)
     || /stabilityai\/stable-diffusion-3\.5-large/i.test(model);
   const usesOpenAiImageApi = /\/v1\/images\/generations\/?$/i.test(endpoint);
@@ -278,7 +282,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   });
 
   try {
-    let response = await fetch(requestEndpoint, {
+    let response = await fetchNvidiaWithRetry(requestEndpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -308,7 +312,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             size: `${asBoundedNumber(body.width, DEFAULT_WIDTH, 64, 2048)}x${asBoundedNumber(body.height, DEFAULT_HEIGHT, 64, 2048)}`,
             ...(body.seed !== undefined ? { seed: asBoundedNumber(body.seed, 0, 0, 4_294_967_295) } : {}),
           };
-          response = await fetch(legacyUrl, {
+          response = await fetchNvidiaWithRetry(legacyUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -325,7 +329,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (response.status === 404 && usesOpenAiImageApi && !image && !usesFlux2KleinApi) {
           const flux2Payload = createFlux2Payload(prompt, body, "");
           console.warn("[IMAGE] Configured NVIDIA hosted image route returned 404; retrying with FLUX.2 Klein 4B.");
-          response = await fetch(NVIDIA_HOSTED_FLUX2_ENDPOINT, {
+          response = await fetchNvidiaWithRetry(NVIDIA_HOSTED_FLUX2_ENDPOINT, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -350,6 +354,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!response.ok) {
       console.error("[IMAGE] NVIDIA image API error:", response.status, responseText.slice(0, 500));
+      if (response.status === 429) {
+        const retryAfter = response.headers.get("retry-after");
+        if (retryAfter) res.setHeader("Retry-After", retryAfter);
+        return res.status(429).json({
+          error: "NVIDIA is rate-limiting image generation. Please retry shortly.",
+          status: "RATE_LIMITED",
+          retryable: true,
+        });
+      }
+      if (response.status === 408 || response.status === 504) {
+        return res.status(504).json({
+          error: "NVIDIA image generation timed out. Please retry.",
+          status: "UPSTREAM_TIMEOUT",
+          retryable: true,
+        });
+      }
       return res.status(response.status >= 500 ? 502 : response.status).json({
         error: "NVIDIA image generation failed",
         status: "UPSTREAM_ERROR",
@@ -374,6 +394,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (error) {
     console.error("[IMAGE] NVIDIA request failed:", error);
+    if (error instanceof Error && error.name === "AbortError") {
+      return res.status(504).json({
+        error: "NVIDIA image generation timed out after retries. Please retry shortly.",
+        status: "UPSTREAM_TIMEOUT",
+        retryable: true,
+      });
+    }
     return res.status(502).json({
       error: "NVIDIA image generation service is unavailable",
       status: "UPSTREAM_ERROR",

@@ -138,10 +138,10 @@ Existing pre-Firebase chats are not automatically copied into a signed-in accoun
 - `NVIDIA_API_KEY` — NVIDIA's OpenAI-compatible API for chat
 - `NVIDIA_MODE` — Model selection (e.g., `meta/llama-3.1-70b`)
 - `NVIDIA_IMAGE_API_KEY` — Optional image-provider key; falls back to `NVIDIA_API_KEY`
-- `NVIDIA_IMAGE_ENDPOINT` — Optional; defaults to NVIDIA's hosted Stable Diffusion 3.5 Large endpoint
-- `NVIDIA_IMAGE_MODEL` — Optional; defaults to `stabilityai/stable-diffusion-3.5-large`
+- `NVIDIA_IMAGE_ENDPOINT` — Required URL for a deployed Stable Diffusion 3.5 Large NIM endpoint
+- `NVIDIA_IMAGE_MODEL` — Optional model identifier; defaults to Stable Diffusion 3.5 Large for model-specific `/v1/infer` endpoints
 
-Image provider keys must remain server-side and must not use a `VITE_` prefix. Stable Diffusion 3.5 Large is subject to NVIDIA's API trial terms and Stability AI's model terms; review the model's license before commercial use.
+Image provider keys must remain server-side and must not use a `VITE_` prefix. The [NVIDIA Build listing](https://build.nvidia.com/stabilityai/stable-diffusion-3_5-large) currently marks Stable Diffusion 3.5 Large as downloadable; it does not provide a hosted endpoint for the model. Deploy the NIM and set `NVIDIA_IMAGE_ENDPOINT` to its reachable inference route. See [NVIDIA's NIM getting-started guide](https://docs.nvidia.com/nim/visual-genai/latest/getting-started.html). The model listing specifies non-commercial use; contact Stability AI for commercial-use terms.
 
 **Online media search**:
 - `SERPER_API_KEY` — (Optional) server-only Serper.dev key for searching online images and videos. Add it to the Vercel project's environment variables; do not use a `VITE_` prefix. Without it, regular chat continues to work and media search is simply unavailable.
