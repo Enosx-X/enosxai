@@ -1,3 +1,8 @@
+## v0.1.26 — Versioned installers & stable UI regression
+
+- Synchronized Tauri, Cargo, and desktop package versions with the release tag so installer filenames and embedded versions match.
+- Added a small CSS-pixel rounding tolerance to the viewport regression check while retaining the header/composer overlap assertions.
+
 ## v0.1.25 — Voice, Monitoring & Release QA
 
 - Added real-time microphone waveform visualization to the composer, sharing the active microphone stream with speech recognition.
