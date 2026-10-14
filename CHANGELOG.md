@@ -1,3 +1,7 @@
+## v0.1.27 — Compact Sidebar Icons
+
+- Reduced sidebar navigation, conversation, delete, profile, and close icon sizes while preserving the existing button hit areas and labels.
+
 ## v0.1.26 — Versioned installers & stable UI regression
 
 - Synchronized Tauri, Cargo, and desktop package versions with the release tag so installer filenames and embedded versions match.
