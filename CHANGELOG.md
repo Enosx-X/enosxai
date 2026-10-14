@@ -1,3 +1,8 @@
+## v0.1.22 — Faster hosted image generation
+
+- Route NVIDIA's retired hosted Qwen text-image endpoint directly to FLUX.2 Klein, avoiding a slow, guaranteed 404 request before the existing fallback.
+- Preserve compatibility with custom OpenAI-style image endpoints by retaining their 404 fallback behavior.
+
 ## v0.1.20 — Image collections & error reporting
 
 - Group uploaded photos into a compact, navigable collection with a full-screen viewer.

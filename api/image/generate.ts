@@ -170,8 +170,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const usesOpenAiImageApi = /\/v1\/images\/generations\/?$/i.test(endpoint);
   const usesFluxKontextApi = /\/v1\/genai\/black-forest-labs\/flux\.1-kontext-dev\/?$/i.test(endpoint);
   const usesFlux2KleinEndpoint = /\/v1\/genai\/black-forest-labs\/flux\.2-klein-4b\/?$/i.test(endpoint);
-  const usesFlux2KleinApi = usesFlux2KleinEndpoint || (usesFluxKontextApi && !image);
-  const requestEndpoint = usesFluxKontextApi && !image ? NVIDIA_HOSTED_FLUX2_ENDPOINT : endpoint;
+  const isNvidiaHostedImagesEndpoint = (() => {
+    try {
+      return new URL(endpoint).hostname === "ai.api.nvidia.com";
+    } catch {
+      return false;
+    }
+  })();
+  // NVIDIA's hosted Qwen Images route is retired. For that known route, skip
+  // the doomed request and use FLUX.2 Klein immediately; keep 404 fallback for
+  // other OpenAI-compatible endpoints so custom deployments remain supported.
+  const directFlux2TextRoute = !image && (
+    usesFluxKontextApi || (usesOpenAiImageApi && isNvidiaHostedImagesEndpoint)
+  );
+  const usesFlux2KleinApi = usesFlux2KleinEndpoint || directFlux2TextRoute;
+  const requestEndpoint = directFlux2TextRoute ? NVIDIA_HOSTED_FLUX2_ENDPOINT : endpoint;
   const requiresInputImage = /nvpcb|image-edit/i.test(model || "");
   if (usesOpenAiImageApi && image) {
     return res.status(400).json({
@@ -224,7 +237,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         cfg_scale: asBoundedNumber(body.cfg_scale, 7, 0, 20),
         steps: asBoundedNumber(body.steps, DEFAULT_DIFFUSION_STEPS, 1, 150),
       };
-  if (usesOpenAiImageApi && (body.width !== undefined || body.height !== undefined)) {
+  if (usesOpenAiImageApi && !usesFlux2KleinApi && (body.width !== undefined || body.height !== undefined)) {
     const width = asBoundedNumber(body.width, DEFAULT_WIDTH, 512, 1664);
     const height = asBoundedNumber(body.height, DEFAULT_HEIGHT, 512, 1664);
     payload.size = `${width}x${height}`;
@@ -284,7 +297,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // NVIDIA's hosted Qwen Image route was retired while the model remains
         // downloadable. Keep existing deployments working by falling back to
         // NVIDIA's currently hosted Flux endpoint for text-to-image requests.
-        if (response.status === 404 && usesOpenAiImageApi && !image) {
+        if (response.status === 404 && usesOpenAiImageApi && !image && !usesFlux2KleinApi) {
           const flux2Payload = createFlux2Payload(prompt, body, "");
           console.warn("[IMAGE] Configured NVIDIA hosted image route returned 404; retrying with FLUX.2 Klein 4B.");
           response = await fetch(NVIDIA_HOSTED_FLUX2_ENDPOINT, {
