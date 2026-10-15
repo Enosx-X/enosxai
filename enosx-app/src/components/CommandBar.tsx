@@ -132,7 +132,7 @@ export default function CommandBar({
       ? "Ask ENOSX to inspect your video in real time..."
       : hasImageAttachment
         ? "Ask ENOSX to analyze your image..."
-        : "Intelligent real-time monitoring...";
+        : "Ask Enosx anything...";
 
   // Sync transcript to input
   useEffect(() => {

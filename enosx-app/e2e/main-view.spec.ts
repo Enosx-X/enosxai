@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 async function openWorkspace(page: Page) {
   await page.goto("/");
-  await expect(page.getByPlaceholder("Intelligent real-time monitoring...")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByPlaceholder("Ask Enosx anything...")).toBeVisible({ timeout: 30_000 });
 }
 
 test("welcome view keeps the composer inside the viewport", async ({ page }) => {
