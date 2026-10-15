@@ -315,7 +315,7 @@ export default function ProfilePanel({ isOpen, onClose, onOpenAdminConsole, onOp
                       : view === 'appearance' ? 'Colors, fonts, and wallpaper'
                       : view === 'privacy' ? 'Data and account security'
                       : view === 'voice' ? 'Speech, speed, and hands-free mode'
-                      : isAuthenticated ? user?.email : 'ENOSX Assistant'}
+                      : isAuthenticated ? user?.email : 'Enosx'}
                   </div>
                 </div>
               </div>
