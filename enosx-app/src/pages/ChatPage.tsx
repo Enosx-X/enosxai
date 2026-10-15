@@ -392,14 +392,6 @@ export default function ChatPage() {
   const { activeWindow } = useActiveWindow();
   const { enrichMessageWithContext } = useContextAwareMessages();
   const { fileContext, getFileContextMessage, clearFiles, loadFile, removeFile } = useFileContext();
-  const monitoringSnapshot = {
-    totalMessages: analytics.totalMessages,
-    totalConversations: analytics.totalConversations,
-    voiceUsageCount: analytics.voiceUsageCount,
-    isListening: voiceState === "listening",
-    isProcessing: isLoading,
-    filesInContext: fileContext.files.length,
-  };
   const { getMemoryContext, addMemory } = useMemoryBank();
   const { getSkillContext, getKnowledgeContext, addEntry } = useKnowledgeBank();
   const { parseActions } = useSystemActions();
@@ -998,7 +990,6 @@ ${getAdminContext()}` : ""}`,
           onFilesSelected={handleFilesSelected}
           attachments={fileContext.files}
           audioStream={microphoneStream}
-          monitoring={monitoringSnapshot}
           onSettingsClick={() => setShowProfilePanel(true)}
         />
       </GlobalLayout>
@@ -1114,7 +1105,6 @@ ${getAdminContext()}` : ""}`,
               <WelcomeScreen
                 key="welcome"
                 onSuggestion={(text) => void handleSendTracked(text)}
-                monitoring={monitoringSnapshot}
               />
             ) : (
               <motion.div 

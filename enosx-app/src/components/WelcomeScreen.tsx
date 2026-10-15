@@ -1,20 +1,16 @@
 /*
  * ENOSX AI — WelcomeScreen
- * Animated welcome with floating orb avatar and live monitoring widgets.
+ * Animated welcome with floating orb avatar.
  */
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
 import BrandMark from "./BrandMark";
-import MonitoringDashboard, { type MonitoringSnapshot } from "./MonitoringDashboard";
-
-export type { MonitoringSnapshot } from "./MonitoringDashboard";
 
 interface WelcomeScreenProps {
   onSuggestion: (text: string) => void;
   isCompact?: boolean;
-  monitoring?: MonitoringSnapshot;
 }
 
 const GREETINGS = [
@@ -27,7 +23,7 @@ const GREETINGS = [
   "Ready to transform your workflow."
 ];
 
-export default function WelcomeScreen({ onSuggestion, isCompact, monitoring }: WelcomeScreenProps) {
+export default function WelcomeScreen({ onSuggestion, isCompact }: WelcomeScreenProps) {
   const { config } = useTheme();
   const [greetingIndex, setGreetingIndex] = useState(0);
 
@@ -73,7 +69,6 @@ export default function WelcomeScreen({ onSuggestion, isCompact, monitoring }: W
           <p className="mt-2 text-sm text-white/50">Your private, real-time ENOSX workspace</p>
         </motion.div>
 
-        <MonitoringDashboard snapshot={monitoring} />
       </div>
     </div>
   );

@@ -5,11 +5,9 @@ async function openWorkspace(page: Page) {
   await expect(page.getByPlaceholder("Intelligent real-time monitoring...")).toBeVisible({ timeout: 30_000 });
 }
 
-test("welcome view exposes the live dashboard and a non-overlapping composer", async ({ page }) => {
+test("welcome view keeps the composer inside the viewport", async ({ page }) => {
   await openWorkspace(page);
-  await expect(page.getByRole("region", { name: "Live monitoring dashboard" })).toBeVisible();
-  await expect(page.getByTestId("monitoring-widget-runtime")).toContainText("Ready");
-  await expect(page.getByTestId("monitoring-widget-messages")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Live monitoring dashboard" })).toHaveCount(0);
 
   const geometry = await page.evaluate(() => {
     const header = document.querySelector("main header")?.getBoundingClientRect();
@@ -29,19 +27,6 @@ test("welcome view exposes the live dashboard and a non-overlapping composer", a
   expect(geometry.composerLeft).toBeGreaterThanOrEqual(0);
   expect(geometry.composerRight).toBeLessThanOrEqual(geometry.viewportWidth);
   expect(geometry.composerBottom).toBeLessThanOrEqual(geometry.viewportHeight + 2);
-});
-
-test("dashboard widget visibility and order persist across reloads", async ({ page }) => {
-  await openWorkspace(page);
-  await page.getByRole("button", { name: "Customize monitoring widgets" }).click();
-  await page.getByRole("button", { name: "Move Conversations up" }).click();
-  await page.getByRole("checkbox", { name: "Files in context" }).uncheck();
-  await expect(page.getByTestId("monitoring-widget-files")).toHaveCount(0);
-  await page.reload();
-  await expect(page.getByPlaceholder("Intelligent real-time monitoring...")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId("monitoring-widget-files")).toHaveCount(0);
-  const order = await page.locator('[data-testid^="monitoring-widget-"]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-testid")));
-  expect(order.indexOf("monitoring-widget-conversations")).toBeLessThan(order.indexOf("monitoring-widget-messages"));
 });
 
 test("voice input shows a live waveform while listening", async ({ page }) => {
