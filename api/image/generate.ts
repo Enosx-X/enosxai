@@ -62,40 +62,88 @@ function createFlux2Payload(prompt: string, body: any, imagePayload: string) {
   };
 }
 
-function extractImagePayload(data: any) {
-  const candidates = [
-    data?.image,
-    data?.images?.[0],
-    data?.data?.[0],
-    data?.artifacts?.[0],
-    data?.output?.images?.[0],
-    data?.output?.[0],
-    data?.result?.image,
-    data?.result?.images?.[0],
-    data?.result?.artifacts?.[0],
-    data?.response?.artifacts?.[0],
-    data?.data?.artifacts?.[0],
-    data?.artifact,
-  ];
+const IMAGE_PAYLOAD_KEY =
+  /^(?:image|images|img|b64|b64_?json|base64|image_?base64|generated_?image|artifacts?|data|output|result|response)$/i;
 
-  for (const rawCandidate of candidates) {
-    const candidate = typeof rawCandidate === "string"
-      ? rawCandidate
-      : rawCandidate && typeof rawCandidate === "object"
-        ? rawCandidate.url || rawCandidate.image_url || rawCandidate.b64_json || rawCandidate.base64 || rawCandidate.image || rawCandidate.data
-        : null;
-    if (typeof candidate !== "string" || candidate.length === 0) continue;
-    if (candidate.startsWith("http://") || candidate.startsWith("https://")) {
-      return { url: candidate, mediaType: rawCandidate?.mime_type || rawCandidate?.media_type || "image/png" };
+function bufferImageMediaType(buffer: Buffer): string | null {
+  if (buffer.length >= 8 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
+    return "image/png";
+  }
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (buffer.length >= 12 && buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP") {
+    return "image/webp";
+  }
+  if (buffer.length >= 6 && buffer.toString("ascii", 0, 3) === "GIF") {
+    return "image/gif";
+  }
+  return null;
+}
+
+function base64ImageMediaType(value: string): string | null {
+  const compact = value.replace(/\s+/g, "");
+  if (compact.length < 64 || !/^[A-Za-z0-9+/]+={0,2}$/.test(compact)) return null;
+  try {
+    return bufferImageMediaType(Buffer.from(compact.slice(0, 96), "base64"));
+  } catch {
+    return null;
+  }
+}
+
+function mediaTypeFromUrl(url: string): string {
+  if (/\.png(?:[?#]|$)/i.test(url)) return "image/png";
+  if (/\.jpe?g(?:[?#]|$)/i.test(url)) return "image/jpeg";
+  if (/\.webp(?:[?#]|$)/i.test(url)) return "image/webp";
+  if (/\.gif(?:[?#]|$)/i.test(url)) return "image/gif";
+  return "image/png";
+}
+
+function extractImagePayload(data: any) {
+  const candidates: Array<{ value: string; key: string }> = [];
+  const seen = new Set<unknown>();
+
+  // Walk the whole response so image output is found regardless of how deeply
+  // (or unusually) a given NVIDIA NIM deployment nests it.
+  const visit = (node: unknown, key: string, depth: number) => {
+    if (node == null || depth > 8) return;
+    if (typeof node === "string") {
+      if (node.length > 0) candidates.push({ value: node, key });
+      return;
     }
-    if (candidate.startsWith("data:image/")) {
-      const mediaType = candidate.slice(5, candidate.indexOf(";"));
-      return { url: candidate, mediaType: mediaType || "image/png" };
+    if (typeof node !== "object") return;
+    if (seen.has(node)) return;
+    seen.add(node);
+    if (Array.isArray(node)) {
+      for (const item of node) visit(item, key, depth + 1);
+      return;
     }
-    const mediaType = rawCandidate && typeof rawCandidate === "object"
-      ? rawCandidate.mime_type || rawCandidate.media_type || "image/png"
-      : "image/png";
-    return { url: `data:${mediaType};base64,${candidate}`, mediaType };
+    for (const [childKey, childValue] of Object.entries(node as Record<string, unknown>)) {
+      visit(childValue, childKey, depth + 1);
+    }
+  };
+  visit(data, "", 0);
+
+  const toResult = (value: string, key: string) => {
+    const trimmed = value.trim();
+    if (trimmed.startsWith("data:image/")) {
+      const mediaType = trimmed.slice(5, trimmed.indexOf(";")) || "image/png";
+      return { url: trimmed, mediaType };
+    }
+    if (/^https?:\/\//i.test(trimmed)) {
+      const urlLikeKey = /url|image|img|artifact/i.test(key);
+      if (!urlLikeKey && !/\.(?:png|jpe?g|webp|gif|bmp|avif)(?:[?#]|$)/i.test(trimmed)) return null;
+      return { url: trimmed, mediaType: mediaTypeFromUrl(trimmed) };
+    }
+    const mediaType = base64ImageMediaType(trimmed);
+    if (!mediaType) return null;
+    return { url: `data:${mediaType};base64,${trimmed.replace(/\s+/g, "")}`, mediaType };
+  };
+
+  const ordered = [...candidates.filter((candidate) => IMAGE_PAYLOAD_KEY.test(candidate.key)), ...candidates];
+  for (const candidate of ordered) {
+    const result = toResult(candidate.value, candidate.key);
+    if (result) return result;
   }
 
   return null;
@@ -292,7 +340,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       body: JSON.stringify(payload),
     });
 
-    let responseText = await response.text();
     // NVIDIA Visual GenAI NIM exposes OpenAI-compatible image editing at
     // /v1/images/edits. Older configuration used /v1/infer, which now returns
     // a plain 404. Retry on the same host with the official route and schema.
@@ -321,7 +368,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             },
             body: JSON.stringify(nimPayload),
           });
-          responseText = await response.text();
         }
         // NVIDIA's hosted Qwen Image route was retired while the model remains
         // downloadable. Keep existing deployments working by falling back to
@@ -338,19 +384,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             },
             body: JSON.stringify(flux2Payload),
           });
-          responseText = await response.text();
         }
       } catch (retryError) {
         console.error("[IMAGE] NVIDIA NIM endpoint retry failed:", retryError);
       }
     }
-    const data = (() => {
-      try {
-        return JSON.parse(responseText);
-      } catch {
-        return null;
-      }
-    })();
+
+    // Some NIM deployments return the rendered image as binary bytes rather than
+    // JSON. Read the body according to its content type so both shapes work.
+    const responseContentType = response.headers.get("content-type") || "";
+    let responseText = "";
+    let binaryImageUrl = "";
+    if (/^image\//i.test(responseContentType)) {
+      const imageBuffer = Buffer.from(await response.arrayBuffer());
+      const mediaType = responseContentType.split(";")[0].trim() || "image/png";
+      binaryImageUrl = `data:${mediaType};base64,${imageBuffer.toString("base64")}`;
+    } else {
+      responseText = await response.text();
+    }
+    const data = responseText
+      ? (() => {
+          try {
+            return JSON.parse(responseText);
+          } catch {
+            return null;
+          }
+        })()
+      : null;
 
     if (!response.ok) {
       console.error("[IMAGE] NVIDIA image API error:", response.status, responseText.slice(0, 500));
@@ -376,7 +436,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const generatedImage = extractImagePayload(data);
+    const generatedImage = binaryImageUrl
+      ? { url: binaryImageUrl, mediaType: responseContentType.split(";")[0].trim() || "image/png" }
+      : extractImagePayload(data) || (responseText ? extractImagePayload(responseText) : null);
     if (!generatedImage) {
       console.error("[IMAGE] NVIDIA response did not contain a supported image payload:", responseText.slice(0, 1000));
       return res.status(502).json({
