@@ -110,8 +110,13 @@ When a user message begins with [GOD MODE COMMAND], switch to advanced operator 
 
 // Keep enough recent context for continuity without repeatedly pre-filling
 // very long transcripts on every streamed turn.
-const MAX_HISTORY_MESSAGES = 20;
+const MAX_HISTORY_MESSAGES = 40;
 const MAX_MESSAGE_CHARS = 20_000;
+// Total character budget for the retained conversation history. This lets long
+// chats keep far more context than the message-count cap alone, while still
+// bounding the payload sent to the provider so a single huge thread cannot
+// overflow the model context window or inflate latency/cost.
+const MAX_HISTORY_CHARS = 120_000;
 const PROVIDER_RETRY_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 
 async function fetchNvidiaWithRetry(url: string, apiKey: string, body: unknown) {
@@ -194,10 +199,25 @@ function shapeMessages(messages: any[]) {
   const candidateMessages = messages.filter((message) => message && ["system", "user", "assistant"].includes(message.role));
   const systemMessages = candidateMessages.filter((message) => message.role === "system");
   const nonSystemMessages = candidateMessages.filter((message) => message.role !== "system");
-  const retainedMessages = [
-    ...systemMessages,
-    ...nonSystemMessages.slice(-Math.max(1, MAX_HISTORY_MESSAGES - systemMessages.length)),
-  ];
+  const recentMessages = nonSystemMessages.slice(
+    -Math.max(1, MAX_HISTORY_MESSAGES - systemMessages.length),
+  );
+  // Keep the most recent turns that fit inside the character budget. Older
+  // turns beyond that are dropped from the front so the newest context always
+  // survives, matching how larger models expect a sliding window.
+  let historyChars = 0;
+  const budgetedMessages: typeof recentMessages = [];
+  for (let index = recentMessages.length - 1; index >= 0; index -= 1) {
+    const message = recentMessages[index];
+    const length =
+      typeof message.content === "string"
+        ? message.content.length
+        : JSON.stringify(message.content ?? "").length;
+    if (historyChars + length > MAX_HISTORY_CHARS) break;
+    historyChars += length;
+    budgetedMessages.unshift(message);
+  }
+  const retainedMessages = [...systemMessages, ...budgetedMessages];
   const selectedVisuals = new Map<any, { image: boolean; frames: string[] }>();
   let remainingVisuals = 10;
   for (const message of [...retainedMessages].reverse()) {

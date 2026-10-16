@@ -15,8 +15,8 @@ export interface MemoryEntry {
 }
 
 const STORAGE_KEY = "enosx_memory_bank";
-const MAX_CONTEXT_CHARS = 6000;
-const MAX_USER_MEMORIES = 10;
+const MAX_CONTEXT_CHARS = 9000;
+const MAX_USER_MEMORIES = 14;
 
 function loadStoredMemories(): MemoryEntry[] {
   try {
