@@ -1,3 +1,11 @@
+## v0.1.28 — Connector logo composer & richer self-awareness
+
+- Replaced the composer's "Connectors" text button with the connector logos themselves; selected connectors now stack like a page group, with a `+N` overflow when more than three are chosen.
+- Added a `size` prop to the connector logo so it renders crisply at small composer sizes.
+- Shrunk the composer's AI-mode selector, attach, voice, and send buttons and the floating sidebar navigation icons for a tighter layout.
+- Expanded ENOSX AI's system prompt so it knows and accurately reports its capabilities (chat modes, multimodal analysis, image generation, voice, media search, connectors, offline models, desktop app, documents, memory, error reporting) and Enosx Technologies details.
+- Includes the previously unpushed context-window and long-term memory selection improvements.
+
 ## v0.1.27 — Compact Sidebar Icons
 
 - Reduced sidebar navigation, conversation, delete, profile, and close icon sizes while preserving the existing button hit areas and labels.

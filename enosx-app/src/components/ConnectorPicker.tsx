@@ -70,6 +70,13 @@ export default function ConnectorPicker({
   }, [kindFilter, query]);
 
   const selectedCount = selectedConnectorIds.length;
+  const selectedConnectors = useMemo(
+    () =>
+      selectedConnectorIds
+        .map((id) => CONNECTOR_CATALOG.find((connector) => connector.id === id))
+        .filter((connector): connector is (typeof CONNECTOR_CATALOG)[number] => Boolean(connector)),
+    [selectedConnectorIds],
+  );
   const githubConnected = accounts.length > 0;
   const isConnected = (id: string) => id === "github" ? githubConnected : connectedIds.includes(id);
 
@@ -104,7 +111,8 @@ export default function ConnectorPicker({
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="group flex items-center gap-1.5 rounded-xl px-3 py-1.5 font-semibold text-xs whitespace-nowrap transition-all"
+        aria-label="Connectors"
+        className="group flex items-center rounded-xl px-1.5 py-1 transition-all"
         style={{
           background:
             selectedCount > 0
@@ -122,17 +130,30 @@ export default function ConnectorPicker({
         }}
         title="Choose connectors for this chat"
       >
-        <Cable size={13} />
-        Connectors
-        {selectedCount > 0 && (
-          <span
-            className="min-w-4 h-4 px-1 rounded-full flex items-center justify-center text-[10px]"
-            style={{
-              background: `rgba(${config.accentRgb}, 0.25)`,
-              color: config.accent,
-            }}
-          >
-            {selectedCount}
+        {selectedConnectors.length === 0 ? (
+          <Cable size={16} />
+        ) : (
+          <span className="flex items-center">
+            {selectedConnectors.slice(0, 3).map((connector, index) => (
+              <span
+                key={connector.id}
+                className="relative flex items-center justify-center rounded-lg"
+                style={{
+                  marginLeft: index === 0 ? 0 : -9,
+                  zIndex: 20 - index,
+                  boxShadow: "0 0 0 2px rgba(12,12,14,0.92)",
+                }}
+              >
+                <ConnectorLogo
+                  name={connector.name}
+                  accent={kindColor(connector.kind)}
+                  size={18}
+                />
+              </span>
+            ))}
+            {selectedCount > 3 && (
+              <span className="ml-1 text-[10px] font-bold">+{selectedCount - 3}</span>
+            )}
           </span>
         )}
       </motion.button>

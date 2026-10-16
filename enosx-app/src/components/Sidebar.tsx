@@ -198,7 +198,7 @@ export default function Sidebar({
               }}
               title={collapsed ? item.label : undefined}
             >
-              <Icon size={14} className="flex-shrink-0" />
+              <Icon size={12} className="flex-shrink-0" />
               {!collapsed && (
                 <div className="flex flex-col items-start overflow-hidden flex-1">
                   <div className="flex items-center justify-between w-full">
@@ -251,7 +251,7 @@ export default function Sidebar({
                 title={collapsed ? conv.title : undefined}
               >
                 <ConversationIcon
-                  size={11}
+                  size={10}
                   style={{ color: activeId === conv.id || isGodModeConversation ? modeAccent : config.textMuted, flexShrink: 0 }}
                 />
                 {!collapsed && (
@@ -268,7 +268,7 @@ export default function Sidebar({
                   className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1"
                   aria-label={`Delete ${conv.title}`}
                 >
-                  <Trash2 size={10} />
+                  <Trash2 size={9} />
                 </motion.button>
               )}
               </div>
@@ -298,7 +298,7 @@ export default function Sidebar({
                 className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold"
                 style={{ background: `rgba(${config.accentRgb}, 0.2)`, color: config.accent }}
               >
-                {isAuthenticated && user?.displayName ? user.displayName.charAt(0).toUpperCase() : <User size={11} />}
+                {isAuthenticated && user?.displayName ? user.displayName.charAt(0).toUpperCase() : <User size={10} />}
               </div>
             )
           }

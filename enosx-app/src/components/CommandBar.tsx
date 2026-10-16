@@ -299,7 +299,7 @@ export default function CommandBar({
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => setModeOpen((o) => !o)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-semibold text-[11px] whitespace-nowrap transition-all"
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-lg font-semibold text-[10px] whitespace-nowrap transition-all"
                   style={{
                     background: currentMode.bgColor,
                     border: `1.5px solid ${currentMode.color}`,
@@ -309,7 +309,7 @@ export default function CommandBar({
                 >
                   {currentMode.label}
                   <ChevronDown
-                    size={11}
+                    size={10}
                     style={{
                       transform: modeOpen ? "rotate(180deg)" : "rotate(0deg)",
                       transition: "transform 0.2s ease",
@@ -420,12 +420,12 @@ export default function CommandBar({
                     whileTap={{ scale: 0.92 }}
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="min-h-8 min-w-8 w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 touch-manipulation"
+                    className="min-h-7 min-w-7 w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 touch-manipulation"
                     style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", color: config.textMuted }}
                     title="Attach any file"
                     aria-label="Attach any file"
                   >
-                    <Paperclip size={16} />
+                    <Paperclip size={14} />
                   </motion.button>
                 )}
 
@@ -436,7 +436,7 @@ export default function CommandBar({
                     whileHover={{ scale: 1.08 }}
                     whileTap={{ scale: 0.92 }}
                     onClick={handleVoiceClick}
-                    className="relative min-h-8 min-w-8 w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 touch-manipulation"
+                    className="relative min-h-7 min-w-7 w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 touch-manipulation"
                     style={
                       isListening || isSpeaking
                         ? {
@@ -461,11 +461,11 @@ export default function CommandBar({
                       />
                     )}
                     {isSpeaking ? (
-                      <Square size={16} />
+                      <Square size={14} />
                     ) : isListening ? (
-                      <MicOff size={16} />
+                      <MicOff size={14} />
                     ) : (
-                      <Mic size={16} />
+                      <Mic size={14} />
                     )}
                   </motion.button>
                 )}
@@ -477,7 +477,7 @@ export default function CommandBar({
                   whileTap={canSend ? { scale: 0.92 } : {}}
                   onClick={handleSend}
                   disabled={!canSend}
-                  className="min-h-8 min-w-8 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 touch-manipulation"
+                  className="min-h-7 min-w-7 w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 touch-manipulation"
                   style={
                     canSend
                       ? {
@@ -504,7 +504,7 @@ export default function CommandBar({
                   {isLoading ? (
                     <Clock3 size={16} />
                   ) : (
-                    <ArrowUp size={16} strokeWidth={2.5} />
+                    <ArrowUp size={14} strokeWidth={2.5} />
                   )}
                 </motion.button>
               </div>
