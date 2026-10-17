@@ -5,7 +5,7 @@ import Sidebar from "./Sidebar";
 import MessageBubble from "./MessageBubble";
 import CommandBar, { type AIMode } from "./CommandBar";
 import WelcomeScreen from "./WelcomeScreen";
-import { Conversation, Message, VoiceState } from "@/lib/types";
+import { Conversation, Message, VoiceState, type Attachment } from "@/lib/types";
 import { useTheme } from "@/contexts/ThemeContext";
 
 interface PhoneChatLayoutProps {
@@ -27,10 +27,10 @@ interface PhoneChatLayoutProps {
   isMobileSidebarOpen: boolean;
   setIsMobileSidebarOpen: (open: boolean) => void;
   messagesEndRef: React.RefObject<HTMLDivElement>;
-  isImageMode?: boolean;
-  onToggleImageMode?: () => void;
   isFreeMode?: boolean;
   onFilesSelected?: (files: File[]) => void;
+  attachments?: Attachment[];
+  audioStream?: MediaStream | null;
   onSettingsClick?: () => void;
 }
 
@@ -53,10 +53,10 @@ export default function PhoneChatLayout({
   isMobileSidebarOpen,
   setIsMobileSidebarOpen,
   messagesEndRef,
-  isImageMode = false,
-  onToggleImageMode,
   isFreeMode = false,
   onFilesSelected,
+  attachments = [],
+  audioStream = null,
   onSettingsClick,
 }: PhoneChatLayoutProps) {
   const { config } = useTheme();
@@ -116,10 +116,10 @@ export default function PhoneChatLayout({
           onStartVoice={startListening}
           onStopVoice={stopListening}
           onStopSpeaking={stopSpeaking}
-          isImageMode={isImageMode}
-          onToggleImageMode={onToggleImageMode}
           isFreeMode={isFreeMode}
           onFilesSelected={onFilesSelected}
+          attachments={attachments}
+          audioStream={audioStream}
         />
       </div>
 

@@ -1,9 +1,11 @@
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
+import { showError } from "@/lib/errorReporting";
 
 interface ImageGenerationResult {
-  url: string;
+  url?: string;
   revised_prompt?: string;
+  error?: string;
 }
 
 /**
@@ -13,6 +15,7 @@ interface ImageGenerationResult {
 export function useImageGeneration() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const clearError = useCallback(() => setError(null), []);
 
   const generateImage = useCallback(
     async (prompt: string, image?: string): Promise<ImageGenerationResult | null> => {
@@ -37,22 +40,23 @@ export function useImageGeneration() {
               message = "NVIDIA image generation is not configured on the server.";
             }
             if (errData?.status === "MISSING_IMAGE") {
-              message = "Attach a PCB image before using NVIDIA image generation.";
+              message = "Attach an image before using this image-edit model.";
             }
           } catch {
             /* use default message */
           }
           setError(message);
           if (response.status !== 503) {
-            toast.error(message);
+            showError(message);
           }
-          return null;
+          return { error: message };
         }
 
         const data = (await response.json()) as ImageGenerationResult;
         if (!data?.url) {
-          setError("NVIDIA image generation returned no image.");
-          return null;
+          const message = "NVIDIA image generation returned no image.";
+          setError(message);
+          return { error: message };
         }
 
         return {
@@ -63,8 +67,8 @@ export function useImageGeneration() {
         const message =
           err instanceof Error ? err.message : "NVIDIA image generation failed.";
         setError(message);
-        toast.error(message);
-        return null;
+        showError(message);
+        return { error: message };
       } finally {
         setIsGenerating(false);
       }
@@ -72,5 +76,5 @@ export function useImageGeneration() {
     []
   );
 
-  return { generateImage, isGenerating, error };
+  return { generateImage, isGenerating, error, clearError };
 }

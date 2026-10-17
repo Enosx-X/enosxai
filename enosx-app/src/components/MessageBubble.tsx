@@ -9,12 +9,13 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Copy, Volume2, VolumeX, Check, Download, ExternalLink, FileSearch, ListTree, ShieldCheck, FileText, FileSpreadsheet } from "lucide-react";
+import { Streamdown } from "streamdown";
 import { Message } from "@/lib/types";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useWallpaper } from "@/contexts/WallpaperContext";
 import ImageDisplay from "./ImageDisplay";
 import VideoDisplay from "./VideoDisplay";
-import MediaAttachment from "./MediaAttachment";
+import MediaAttachmentList from "./MediaAttachmentList";
 import { downloadDocument } from "@/lib/documentExport";
 
 interface MessageBubbleProps {
@@ -136,29 +137,18 @@ function extractMediaFromText(text: string): ParsedMedia[] {
   return media.sort((a, b) => a.position - b.position);
 }
 
-function escapeHtml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#39;");
+function renderMarkdown(text: string, isStreaming = false) {
+  return (
+    <Streamdown className="prose-crimson" mode={isStreaming ? "streaming" : "static"} isAnimating={isStreaming}>
+      {text}
+    </Streamdown>
+  );
 }
 
-function renderMarkdown(text: string): string {
-  return escapeHtml(text)
-    .replace(/[\x60]{3}([\s\S]*?)[\x60]{3}/g, '<pre><code>$1</code></pre>')
-    .replace(/[\x60]([^\x60]+)[\x60]/g, '<code>$1</code>')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>[\s\S]*?<\/li>)/g, '<ul>$1</ul>')
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/^(?!<[hupol]|<pre|<code)(.+)$/gm, (match) => match.startsWith('<') ? match : '<p>' + match + '</p>');
-}
-
-function renderContentWithMedia(text: string, _accentColor: string) {
+function renderContentWithMedia(text: string, _accentColor: string, isStreaming = false) {
   const media = extractMediaFromText(text);
   if (media.length === 0) {
-    return <div className="prose-crimson text-sm" dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }} />;
+    return renderMarkdown(text, isStreaming);
   }
 
   const segments: Array<{ type: "text"; content: string } | { type: "media"; item: ParsedMedia }> = [];
@@ -180,7 +170,7 @@ function renderContentWithMedia(text: string, _accentColor: string) {
     <div className="flex flex-col gap-2">
       {segments.map((segment, index) => {
         if (segment.type === "text") {
-          return <div key={index} className="prose-crimson text-sm" dangerouslySetInnerHTML={{ __html: renderMarkdown(segment.content) }} />;
+          return <div key={index}>{renderMarkdown(segment.content, isStreaming)}</div>;
         }
         if (segment.item.type === "image") {
           return <ImageDisplay key={index} src={segment.item.src} alt={segment.item.alt} watermark={/^generated image$/i.test(segment.item.alt)} />;
@@ -200,42 +190,6 @@ function StreamingCursor({ color }: { color: string }) {
       className="inline-block w-0.5 h-4 ml-0.5 align-middle rounded-full"
       style={{ background: color, verticalAlign: "middle" }}
     />
-  );
-}
-
-// ENOSX is thinking... indicator
-function ThinkingDots({ color }: { color: string }) {
-  return (
-    <div className="flex items-center gap-2 py-1">
-      {[0, 1, 2].map((i) => (
-        <motion.div
-          key={i}
-          animate={{
-            scale: [0.6, 1, 0.6],
-            opacity: [0.4, 1, 0.4],
-          }}
-          transition={{
-            duration: 1.2,
-            repeat: Infinity,
-            delay: i * 0.2,
-            ease: "easeInOut",
-          }}
-          className="w-1.5 h-1.5 rounded-full rainbow-thinking-dot"
-          style={{
-            background: color,
-            animation: "rainbow-thinking-dot 4s ease-in-out infinite",
-          }}
-        />
-      ))}
-      <motion.span
-        className="text-xs italic tracking-wide"
-        style={{ color }}
-        animate={{ opacity: [0.4, 0.9, 0.4] }}
-        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-      >
-        ENOSX is thinking<span className="thinking-pulse">...</span>
-      </motion.span>
-    </div>
   );
 }
 
@@ -362,34 +316,33 @@ export default function MessageBubble({
       }}
       className={`flex min-w-0 gap-3 ${isUser ? "flex-row-reverse" : "flex-row"}`}
     >
-      {/* Unboxed message content. Alignment is retained without enclosing chats or media in a panel. */}
+      {/* Flat message surface: media and text are not nested inside chat bubbles. */}
       <div className={`flex min-w-0 max-w-[90%] flex-col gap-1 ${isUser ? "items-end" : "items-start"}`}>
         <motion.div
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
           className={`relative w-full transition-all duration-300 ${!isUser && (isEmpty || isStreaming) ? 'rainbow-glow' : ''}`}
           style={{
+            background: "transparent",
+            border: "0",
+            borderRadius: 0,
+            boxShadow: "none",
             padding: isEmpty ? "4px 0" : "0",
             maxWidth: "100%",
             overflowWrap: "anywhere",
           }}
         >
           {isEmpty ? (
-            <div className="flex flex-col gap-1">
-              <ThinkingDots color={config.accent} />
-              {message.reasoningStatus && <span className="pl-1 text-[10px] tracking-wide text-white/45">{message.reasoningStatus} · private reasoning stays hidden</span>}
-            </div>
+            <span className="sr-only" role="status">Assistant response is being prepared.</span>
           ) : (
             <div className="relative">
               {isUser ? (
                 <div className="flex flex-col gap-3">
-                  {/* User attachments — preview images, music, video, or downloadable files */}
+                  {/* User attachments — images are grouped into one browsable collection */}
                   {message.attachments && message.attachments.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-1">
-                      {message.attachments.map((att) => <MediaAttachment key={att.id} attachment={att} />)}
-                    </div>
+                    <MediaAttachmentList attachments={message.attachments} />
                   )}
                   <div
-                    className="text-sm leading-relaxed"
+                    className="text-base leading-relaxed"
                     style={{ color: config.text }}
                   >
                     {renderContentWithMedia(message.content, config.accent)}
@@ -399,13 +352,10 @@ export default function MessageBubble({
                 <div className="flex flex-col gap-3">
                   {/* Assistant media attachments */}
                   {message.attachments && message.attachments.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-1">
-                      {message.attachments.map((att) => <MediaAttachment key={att.id} attachment={att} />)}
-                    </div>
+                    <MediaAttachmentList attachments={message.attachments} />
                   )}
                   {/* Assistant content with inline image support */}
-                  {message.reasoningStatus && isStreaming && <span className="text-[10px] tracking-wide text-white/45">{message.reasoningStatus}</span>}
-                  {renderContentWithMedia(message.content, config.accent)}
+                  {renderContentWithMedia(message.content, config.accent, isStreaming)}
                   {message.proposedActions && message.proposedActions.length > 0 && (
                     <div className="flex flex-col gap-2 rounded-xl border border-cyan-300/20 bg-cyan-400/[0.06] p-3">
                       <div className="flex items-center gap-2 text-xs font-semibold tracking-wide text-cyan-100">

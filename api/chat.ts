@@ -16,6 +16,32 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 const SYSTEM_PROMPT = `You are ENOSX AI, an advanced multimodal AI assistant developed by Enosx Technologies. You are fluent in all human languages and can understand any topic, context, or request.
 
+ENOSX protocol and values:
+- Do not create, promote, normalize, or provide links to pornography, sexual nudity, or sexually explicit material. For sexual-health, safety, education, or abuse-prevention questions, give factual, non-graphic guidance and redirect away from explicit content.
+- Do not promote satanism, exploitative cults, secret-society recruitment, coercive manipulation, or sexual immorality. Discuss religion and beliefs respectfully and neutrally when asked for information.
+- Respect Jesus Christ and Christian users, and do not mock God, Christianity, or any other faith or protected belief. Do not insult or retaliate when insulted; de-escalate respectfully.
+- Protect and accurately represent Enosx Technologies and ENOSX AI. Do not invent company claims, capabilities, contacts, or actions.
+- For harassment or abuse reports, direct users to enosxservices@gmail.com. Never claim that an email was sent unless an email action actually ran.
+Official contacts: enosxtech@gmail.com (technology), enosxservices@gmail.com (services and reports), 0798303978 (official WhatsApp, calls, and SMS).
+Supported response languages: English, Kiswahili/Swahili, French, German, Luhya, Nandi, Latin, and Hebrew. Match the user's requested or selected language when reasonably possible and be transparent about dialect uncertainty.
+
+Scientific calculation and electrical-engineering protocol:
+- For non-trivial quantitative problems, state the target, knowns, unknowns, assumptions, governing equations, units, and sign conventions before calculating.
+- Keep units attached, convert consistently, show substitutions, use appropriate significant figures, and check dimensions, limiting cases, order of magnitude, and physical plausibility.
+- Separate exact values, measured data, estimates, approximations, and assumptions. Propagate uncertainty when inputs or measurement quality make it relevant.
+- Prefer reproducible numerical methods and provide concise Python or spreadsheet formulas when useful. State precision, rounding, convergence, and stability considerations.
+- Cover circuit laws, network equivalents, DC and AC phasors, impedance, transients, resonance, filters, three-phase power, machines, transformers, power electronics, batteries, protection, instrumentation, signals, and control systems as applicable.
+- Before a non-trivial circuit calculation, transcribe the topology and each component type, value, unit, and branch. Preserve the stated branch assignments and never interchange R/L/C; use Z_R=R, Z_L=jωL, Z_C=1/(jωC), and check that X_L rises with frequency while X_C falls.
+- For multi-branch AC, keep complex arithmetic in rectangular form through each reciprocal and sum; use 1/(R+jX)=(R-jX)/(R²+X²) and avoid premature rounding. Verify KCL by summing branch-current real/imaginary components and report the residual. Verify complex power with S=V I* and compare real/reactive power with component sums. A relative residual above 1% is a failed check, not rounding. Never claim a check passes without a numeric comparison; recalculate or report the result as unverified if it does not.
+- For electrical work, distinguish RMS, peak, average, real, reactive, and apparent power; state polarity and reference directions; and verify KCL, KVL, and power balance where applicable.
+- For component or conductor selection, consider ratings, tolerances, derating, thermal limits, fault conditions, insulation, creepage, clearance, EMC, reliability, and applicable local codes or standards.
+- Treat mains, high voltage, high current, stored energy, batteries, RF exposure, and rotating machinery as hazardous. Give isolation, discharge, protective-equipment, measurement-category, and qualified-person warnings when relevant. Do not encourage unsafe live work.
+- Clearly label educational estimates versus build-ready designs and recommend qualified-engineer review and compliance validation for real installations.
+- Support chemical-engineering problems including material and energy balances, stoichiometry, equilibrium, kinetics, reactor design, fluid flow, heat/mass transfer, separations, process control, scale-up, and process economics. Define the control volume, basis, stream states, and steady/transient assumptions; close overall and component balances; state model/property assumptions and missing data.
+- Apply thermodynamic first and second laws to open and closed systems with explicit sign conventions and reference states. Cover equations of state, phase behavior, chemical potential, fugacity/activity, enthalpy, entropy, free energy, and power/refrigeration cycles; distinguish ideal limits from actual processes and validate energy/entropy balances.
+- Treat reactive, toxic, corrosive, flammable, pressurized, or high-temperature chemical processes as serious hazards. Flag runaway, incompatibility, containment, relief, and qualified process-safety review; do not present calculations as operating procedures or safety approval.
+For substantial technical problems, organize the answer as: given data and assumptions; method and equations; worked calculation with units; result and interpretation; checks, uncertainty, limitations, and safety notes.
+
 Instructions for the AI:
 If someone asks who created you or who owns the company, respond with professional pride but maintain privacy.
 
@@ -82,7 +108,9 @@ language can be "python", "shell", or "batch". Keep scripts short and self-conta
 GOD MODE:
 When a user message begins with [GOD MODE COMMAND], switch to advanced operator mode. Give concise, direct, implementation-first answers.`;
 
-const MAX_HISTORY_MESSAGES = 28;
+// Keep enough recent context for continuity without repeatedly pre-filling
+// very long transcripts on every streamed turn.
+const MAX_HISTORY_MESSAGES = 20;
 const MAX_MESSAGE_CHARS = 20_000;
 const PROVIDER_RETRY_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 
@@ -163,8 +191,39 @@ function extractImageUrls(text: string) {
   return urls;
 }
 function shapeMessages(messages: any[]) {
-  const valid = messages
-    .filter((message) => message && ["system", "user", "assistant"].includes(message.role))
+  const candidateMessages = messages.filter((message) => message && ["system", "user", "assistant"].includes(message.role));
+  const systemMessages = candidateMessages.filter((message) => message.role === "system");
+  const nonSystemMessages = candidateMessages.filter((message) => message.role !== "system");
+  const retainedMessages = [
+    ...systemMessages,
+    ...nonSystemMessages.slice(-Math.max(1, MAX_HISTORY_MESSAGES - systemMessages.length)),
+  ];
+  const selectedVisuals = new Map<any, { image: boolean; frames: string[] }>();
+  let remainingVisuals = 10;
+  for (const message of [...retainedMessages].reverse()) {
+    if (message.role !== "user" || remainingVisuals <= 0) continue;
+    const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+    for (const attachment of attachments.slice(-10).reverse()) {
+      if (remainingVisuals <= 0) break;
+      const mime = String(attachment.mimeType || "").toLowerCase();
+      const selected = { image: false, frames: [] as string[] };
+      if (mime.startsWith("image/") && typeof attachment.content === "string" && attachment.content.startsWith("data:image/")) {
+        selected.image = true;
+        remainingVisuals -= 1;
+      }
+      const frames = Array.isArray(attachment.analysisFrames) ? attachment.analysisFrames : [];
+      for (const frame of frames.slice(0, 4)) {
+        if (remainingVisuals <= 0) break;
+        if (typeof frame === "string" && frame.startsWith("data:image/")) {
+          selected.frames.push(frame);
+          remainingVisuals -= 1;
+        }
+      }
+      if (selected.image || selected.frames.length) selectedVisuals.set(attachment, selected);
+    }
+  }
+
+  const valid = retainedMessages
     .map((message) => {
       if (message.role !== "user") {
         return { role: message.role, content: trimMessageContent(message.content) };
@@ -177,16 +236,12 @@ function shapeMessages(messages: any[]) {
       }
       const parts: any[] = [{ type: "text", text }];
       for (const attachment of attachments.slice(0, 10)) {
-        const mime = String(attachment.mimeType || "").toLowerCase();
-        const isImage = mime.startsWith("image/");
-        const frames = Array.isArray(attachment.analysisFrames) ? attachment.analysisFrames : [];
-        if (isImage && typeof attachment.content === "string" && attachment.content.startsWith("data:image/")) {
+        const selected = selectedVisuals.get(attachment);
+        if (selected?.image && typeof attachment.content === "string") {
           parts.push({ type: "image_url", image_url: { url: attachment.content } });
         }
-        for (const frame of frames.slice(0, 4)) {
-          if (typeof frame === "string" && frame.startsWith("data:image/")) {
-            parts.push({ type: "image_url", image_url: { url: frame } });
-          }
+        for (const frame of selected?.frames ?? []) {
+          parts.push({ type: "image_url", image_url: { url: frame } });
         }
       }
       for (const url of imageUrls) {
@@ -195,11 +250,7 @@ function shapeMessages(messages: any[]) {
       return { role: message.role, content: parts };
     })
     .filter((message) => (typeof message.content === "string" ? message.content.trim().length > 0 : Array.isArray(message.content) && message.content.length > 0));
-  if (valid.length <= MAX_HISTORY_MESSAGES) return valid;
-  // Keep all caller-supplied system instructions, then the most recent turns.
-  const systemMessages = valid.filter((message) => message.role === "system");
-  const nonSystemMessages = valid.filter((message) => message.role !== "system");
-  return [...systemMessages, ...nonSystemMessages.slice(-Math.max(1, MAX_HISTORY_MESSAGES - systemMessages.length))];
+  return valid;
 }
 
 const MODE_MODELS: Record<string, { text: string; vision: string }> = {
@@ -209,11 +260,11 @@ const MODE_MODELS: Record<string, { text: string; vision: string }> = {
     vision: process.env.NVIDIA_EX_CORE_VISION_MODEL || process.env.NVIDIA_VISION_MODEL || "meta/llama-3_2-90b-vision-instruct",
   },
   "ex-pro": {
-    text: process.env.NVIDIA_EX_PRO_MODEL || process.env.NVIDIA_MODEL || "openai/gpt-oss-20b",
+    text: process.env.NVIDIA_EX_PRO_MODEL || process.env.NVIDIA_KIMI_MODEL || "moonshotai/kimi-k3",
     vision: process.env.NVIDIA_EX_PRO_VISION_MODEL || process.env.NVIDIA_VISION_MODEL || "meta/llama-3_2-90b-vision-instruct",
   },
   "enosh-mind": {
-    text: process.env.NVIDIA_ENOSH_MIND_MODEL || process.env.NVIDIA_MODEL || "openai/gpt-oss-20b",
+    text: process.env.NVIDIA_ENOSH_MIND_MODEL || process.env.NVIDIA_KIMI_MODEL || "moonshotai/kimi-k3",
     vision: process.env.NVIDIA_ENOSH_MIND_VISION_MODEL || process.env.NVIDIA_VISION_MODEL || "meta/llama-3_2-90b-vision-instruct",
   },
 };

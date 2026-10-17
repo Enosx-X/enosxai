@@ -113,15 +113,39 @@ Version tags (`v*`) automatically trigger the desktop installer build workflow.
 
 ### Environment Variables
 
-**GitHub OAuth** (Required for sign-in):
-- `GITHUB_CLIENT_ID`
-- `GITHUB_CLIENT_SECRET`
-- `GITHUB_OAUTH_STATE_SECRET`
-- `GITHUB_OAUTH_REDIRECT_ORIGIN`
+**Firebase Auth & Firestore** (web account sign-in, profiles, and chat sync):
+- `VITE_FIREBASE_API_KEY`
+- `VITE_FIREBASE_AUTH_DOMAIN`
+- `VITE_FIREBASE_PROJECT_ID`
+- `VITE_FIREBASE_STORAGE_BUCKET`
+- `VITE_FIREBASE_MESSAGING_SENDER_ID`
+- `VITE_FIREBASE_APP_ID`
+
+These are Firebase Web App client settings, not service-account secrets. Configure them in the Vercel project environment and rebuild the frontend after setting them. Do not put a Firebase service-account key in any `VITE_` variable.
+
+#### Firebase setup
+
+1. Create/select a Firebase project and register a Web app in Firebase Console → **Project settings**.
+2. Enable **Email/Password** and **Google** under **Authentication → Sign-in method**. Add the production site and any preview/test hosts to **Authorized domains**.
+3. Create a Cloud Firestore database, then deploy this repository's rules: `firebase deploy --only firestore:rules` (requires Firebase CLI login and project selection).
+4. Add the six `VITE_FIREBASE_*` Web App settings above to the Vercel project's environment variables and redeploy.
+
+Authentication is handled by Firebase Auth; Firestore stores profiles under `users/{uid}` and chats/messages under that user's document tree. The checked-in `firestore.rules` limits reads and writes to the authenticated matching UID. Firebase Auth persists sign-in on the device/browser; the same Firebase account can be used on phone, tablet, or PC. Guest mode remains local to the device.
+
+Existing pre-Firebase chats are not automatically copied into a signed-in account: they may belong to another person who used the same device. Export or review them before any future account migration.
 
 **AI Services**:
 - `NVIDIA_API_KEY` — NVIDIA's OpenAI-compatible API for chat
-- `NVIDIA_MODE` — Model selection (e.g., `meta/llama-3.1-70b`)
+- EX Pro and ENOSH MIND use NVIDIA `moonshotai/kimi-k3` for text chat by default; set `NVIDIA_EX_PRO_MODEL`, `NVIDIA_ENOSH_MIND_MODEL`, or shared `NVIDIA_KIMI_MODEL` to override server-side.
+- `NVIDIA_MODEL` and `NVIDIA_EX_CORE_MODEL` — Optional EX Core text model configuration
+- `NVIDIA_IMAGE_API_KEY` — Optional image-provider key; falls back to `NVIDIA_API_KEY`
+- `NVIDIA_IMAGE_ENDPOINT` — Required URL for a deployed Stable Diffusion 3.5 Large NIM endpoint
+- `NVIDIA_IMAGE_MODEL` — Optional model identifier; defaults to Stable Diffusion 3.5 Large for model-specific `/v1/infer` endpoints
+
+Image provider keys must remain server-side and must not use a `VITE_` prefix. The [NVIDIA Build listing](https://build.nvidia.com/stabilityai/stable-diffusion-3_5-large) currently marks Stable Diffusion 3.5 Large as downloadable; it does not provide a hosted endpoint for the model. Deploy the NIM and set `NVIDIA_IMAGE_ENDPOINT` to its reachable inference route. See [NVIDIA's NIM getting-started guide](https://docs.nvidia.com/nim/visual-genai/latest/getting-started.html). The model listing specifies non-commercial use; contact Stability AI for commercial-use terms.
+
+**Online media search**:
+- `SERPER_API_KEY` — (Optional) server-only Serper.dev key for searching online images and videos. Add it to the Vercel project's environment variables; do not use a `VITE_` prefix. Without it, regular chat continues to work and media search is simply unavailable.
 
 **Voice**:
 - `ELEVEN_LABS_API_KEY` — ElevenLabs API key (stored as encrypted secret)
@@ -145,7 +169,8 @@ Review the [Deployment & Security Guide](docs/DEPLOYMENT.md) for the complete ch
 ## 🔒 Security & Best Practices
 
 - ✅ Server-side credential management (all API keys encrypted)
-- ✅ GitHub OAuth for secure sign-in
+- ✅ Firebase Auth for email/password and Google sign-in
+- ✅ Firestore rules scope profile and chat data to the authenticated Firebase UID
 - ✅ Signed desktop releases via Tauri
 - ✅ No credentials in version control
 - ✅ Automatic desktop app updates with signature verification
@@ -178,3 +203,8 @@ See [Deployment & Security Guide](docs/DEPLOYMENT.md) for detailed security prac
 ---
 
 **Made with ❤️ by [Enosx Technologies](https://enosxtech.vercel.app)**
+
+
+## Automatic error reporting
+
+Errors shown to users, uncaught browser exceptions, and React rendering failures are automatically submitted to `/api/error-report`. To deliver reports to `enosxtech@gmail.com` and `enosxservices@gmail.com`, set the **server-only** Vercel environment variables `RESEND_API_KEY` and `ERROR_REPORT_FROM`, using a sender verified with Resend, then redeploy. These credentials must not use a `VITE_` prefix. Reports include technical error details, app version, browser, and page path; they exclude conversation text, uploaded files, credentials, and the user's IP address. Delivery is best-effort and duplicate reports from the same client are suppressed for one minute.
