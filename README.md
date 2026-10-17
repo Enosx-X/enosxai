@@ -150,6 +150,8 @@ Image provider keys must remain server-side and must not use a `VITE_` prefix. T
 **Voice**:
 - `ELEVEN_LABS_API_KEY` — ElevenLabs API key (stored as encrypted secret)
 - `ELEVEN_LABS_VOICE_ID` — (Optional) Custom voice ID
+- `NVIDIA_MAGPIE_TTS_API_KEY` — NVIDIA credential for the Magpie multilingual text-to-speech model (server-side only)
+- `NVIDIA_CHATTERBOX_TTS_API_KEY` — NVIDIA credential for the Chatterbox multilingual male voice (server-side only)
 
 ### Production Deployment
 
