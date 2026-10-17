@@ -35,6 +35,11 @@ const TEMPLATES = [
     description: "Develop a creative concept into a usable visual brief.",
     prompt: "Develop this creative idea into a polished visual brief with audience, message, composition, mood, color direction, text guidance, and three useful variations.",
   },
+  {
+    name: "Data to Visual Story",
+    description: "Turn metrics or research findings into a narrated visual sequence.",
+    prompt: "Turn this data into a presentation-ready visual story. Establish the baseline, identify the turning point, and explain the outcome. For each scene, provide a title, narration, recommended visual, exact data emphasis, and restrained animation direction. Do not invent values; label assumptions and include a reduced-motion alternative.",
+  },
 ];
 
 export default function ReusableFeaturesDialog({ open, onClose }: ReusableFeaturesDialogProps) {
