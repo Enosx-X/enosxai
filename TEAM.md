@@ -9,6 +9,7 @@ This repository is part of the ENOSX Technologies ecosystem. The current team st
 | **Grace** | Product Design & User Research Lead | User experience, onboarding, user interviews, and workflow design |
 | **Tracey** | Growth, Marketing & Community Lead | Content, social media, community, referrals, and acquisition |
 | **Frank** | Sales, Partnerships & Customer Success Lead | Customer onboarding, demos, partnerships, and retention |
+| **Vince Odhiambo** | Executive Assistant | Administrative coordination, scheduling, meeting follow-ups, and founder support |
 
 ## How we work
 

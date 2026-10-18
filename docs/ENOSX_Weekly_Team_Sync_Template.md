@@ -5,7 +5,7 @@
 **Meeting date:** YYYY-MM-DD  
 **Facilitator:** Enosh  
 **Note-taker:** [Name]  
-**Attendees:** Enosh, Eddy, Grace, Tracey, Frank  
+**Attendees:** Enosh, Eddy, Grace, Tracey, Frank, Vince
 **Primary company priority:** [One sentence]
 
 ---
@@ -112,6 +112,20 @@
 [Specific deliverable and due date.]
 
 **Decision or support needed:**  
+[Write “None” if not applicable.]
+
+### Vince Odhiambo — Executive Assistant
+
+**Completed:**
+- [ ]
+
+**Measured result:**
+[Meetings coordinated, decisions captured, follow-ups closed, or founder priorities unblocked.]
+
+**Next commitment:**
+[Specific coordination deliverable and due date.]
+
+**Decision or support needed:**
 [Write “None” if not applicable.]
 
 ---

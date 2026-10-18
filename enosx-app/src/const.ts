@@ -64,6 +64,11 @@ export const LEADERSHIP = [
     role: "Sales, Partnerships & Customer Success Lead",
     specialty: "Customers, demonstrations, partnerships, onboarding, and retention",
   },
+  {
+    name: "Vince Odhiambo",
+    role: "Executive Assistant",
+    specialty: "Administrative coordination, scheduling, meeting follow-ups, and founder support",
+  },
 ] as const;
 
 export const FOUNDER_NAME = LEADERSHIP[0].name;
