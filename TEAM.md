@@ -6,14 +6,14 @@ This repository is part of the ENOSX Technologies ecosystem. The current team st
 |---|---|---|
 | **Enosh Yeswa** | Founder & Chief Executive Officer | Product direction across ENOSX AI, Enosx Tech Store, and ExLover Coach |
 | **Eddy** | Product & Engineering Lead | Product development, infrastructure, integrations, and security |
-| **Grace** | Product Design & User Research Lead | User experience, onboarding, user interviews, and workflow design |
-| **Tracey** | Growth, Marketing & Community Lead | Content, social media, community, referrals, and acquisition |
+| **Grace Wangare** | Product Design & User Research Lead | User experience, onboarding, user interviews, and workflow design |
+| **Tracey Ivyone** | Growth, Marketing & Community Lead | Content, social media, community, referrals, and acquisition |
 | **Frank** | Sales, Partnerships & Customer Success Lead | Customer onboarding, demos, partnerships, and retention |
 | **Vince Odhiambo** | Executive Assistant | Administrative coordination, scheduling, meeting follow-ups, and founder support |
 
 ## How we work
 
-Each member owns outcomes, not only a title. The team coordinates around building, acquiring, activating, retaining, and monetizing ENOSX AI users. Enosh sets company priorities and resolves major decisions; role owners make decisions within their areas and report measurable progress weekly.
+Each member owns outcomes, not only a title. The team coordinates around building, acquiring, activating, retaining, and monetizing ENOSX AI users. Enosh Yeswa sets company priorities and resolves major decisions; role owners make decisions within their areas and report measurable progress weekly.
 
 ## Weekly team sync
 

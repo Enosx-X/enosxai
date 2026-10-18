@@ -50,12 +50,12 @@ export const LEADERSHIP = [
     specialty: "Product development, infrastructure, integrations, and security",
   },
   {
-    name: "Grace",
+    name: "Grace Wangare",
     role: "Product Design & User Research Lead",
     specialty: "User experience, onboarding, user interviews, and workflow design",
   },
   {
-    name: "Tracey",
+    name: "Tracey Ivyone",
     role: "Growth, Marketing & Community Lead",
     specialty: "Content, social media, community, referrals, and acquisition",
   },

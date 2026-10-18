@@ -3,9 +3,9 @@
 
 **Week of:** YYYY-MM-DD  
 **Meeting date:** YYYY-MM-DD  
-**Facilitator:** Enosh  
+**Facilitator:** Enosh Yeswa
 **Note-taker:** [Name]  
-**Attendees:** Enosh, Eddy, Grace, Tracey, Frank, Vince
+**Attendees:** Enosh Yeswa, Eddy, Grace Wangare, Tracey Ivyone, Frank, Vince Odhiambo
 **Primary company priority:** [One sentence]
 
 ---
@@ -14,14 +14,14 @@
 
 | Metric | Last week | This week | Target | Owner | Notes |
 |---|---:|---:|---:|---|---|
-| Qualified signups |  |  |  | Tracey |  |
+| Qualified signups |  |  |  | Tracey Ivyone |  |
 | Active users |  |  |  | Eddy |  |
-| Repeat weekly workflows |  |  |  | Grace |  |
+| Repeat weekly workflows |  |  |  | Grace Wangare |  |
 | Product demonstrations |  |  |  | Frank |  |
 | Paying users / pilots |  |  |  | Frank |  |
 | Critical bugs or incidents |  |  |  | Eddy |  |
-| User interviews completed |  |  |  | Grace |  |
-| Content or community outputs |  |  |  | Tracey |  |
+| User interviews completed |  |  |  | Grace Wangare |  |
+| Content or community outputs |  |  |  | Tracey Ivyone |  |
 
 **Headline:** What changed most since the last meeting?
 
@@ -44,7 +44,7 @@
 
 ## 3. Role-by-role progress
 
-### Enosh — Founder and CEO
+### Enosh Yeswa — Founder and CEO
 
 **Completed:**
 - [ ] 
@@ -72,7 +72,7 @@
 **Decision or support needed:**  
 [Write “None” if not applicable.]
 
-### Grace — Product Design and User Research Lead
+### Grace Wangare — Product Design and User Research Lead
 
 **Completed:**
 - [ ] 
@@ -86,7 +86,7 @@
 **Decision or support needed:**  
 [Write “None” if not applicable.]
 
-### Tracey — Growth, Marketing and Community Lead
+### Tracey Ivyone — Growth, Marketing and Community Lead
 
 **Completed:**
 - [ ] 
@@ -177,10 +177,10 @@ Escalate immediately when a blocker affects security, user data, a public commit
 
 | Owner | Commitment | Expected result | Due date | Priority |
 |---|---|---|---|---|
-| Enosh |  |  |  | P0 / P1 / P2 |
+| Enosh Yeswa |  |  |  | P0 / P1 / P2 |
 | Eddy |  |  |  | P0 / P1 / P2 |
-| Grace |  |  |  | P0 / P1 / P2 |
-| Tracey |  |  |  | P0 / P1 / P2 |
+| Grace Wangare |  |  |  | P0 / P1 / P2 |
+| Tracey Ivyone |  |  |  | P0 / P1 / P2 |
 | Frank |  |  |  | P0 / P1 / P2 |
 
 A commitment should be specific enough that the team can decide next week whether it was completed.
