@@ -78,6 +78,12 @@ const createConversation = (): Conversation => ({
   createdAt: new Date(),
   updatedAt: new Date(),
 });
+interface WaitingMessage {
+  id: string;
+  text: string;
+  aiMode?: AIMode;
+  selectedConnectorIds?: string[];
+}
 
 const generateTitle = (firstMessage: string): string => {
   const words = firstMessage.trim().split(/\s+/).slice(0, 6);
@@ -345,6 +351,7 @@ export default function ChatPage() {
   const activeIdRef = useRef<string | null>(null);
   const conversationsRef = useRef<Conversation[]>([]);
   const godModeReturnConversationIdRef = useRef<string | null>(null);
+  const [waitingMessages, setWaitingMessages] = useState<WaitingMessage[]>([]);
   // Prevent double submission (e.g. rapid Enter presses) from adding the same
   // prompt twice to the conversation.
   const sendingRef = useRef(false);
@@ -395,6 +402,16 @@ export default function ChatPage() {
   const { getMemoryContext, addMemory } = useMemoryBank();
   const { getSkillContext, getKnowledgeContext, addEntry } = useKnowledgeBank();
   const { parseActions } = useSystemActions();
+  const enqueueWaitingMessage = useCallback((text: string, aiMode?: AIMode, selectedConnectorIds?: string[]) => {
+    const waitingMessage: WaitingMessage = {
+      id: nanoid(),
+      text,
+      aiMode,
+      selectedConnectorIds,
+    };
+    setWaitingMessages((current) => [...current, waitingMessage]);
+    toast.success("Added to the waiting list");
+  }, []);
 
   const handleFileUpload = useCallback(
     async (file: File) => {
@@ -506,6 +523,10 @@ export default function ChatPage() {
       if (/^enosx(?:\s+ai)?[.!?]*$/i.test(text.trim())) {
         setShowEnosxOnboarding(true);
         return "";
+      }
+      if (sendingRef.current) {
+        enqueueWaitingMessage(text, aiMode, selectedConnectorIds);
+        return "Queued for the next available task slot.";
       }
       if (aiMode) setActiveMode(aiMode);
       // Do not keep showing an old image-generation failure after the user
@@ -817,7 +838,7 @@ ${getAdminContext()}` : ""}`,
         sendingRef.current = false;
       }
     },
-    [sendMessage, speak, autoSpeak, user, fileContext.isLoaded, getFileContextMessage, getMemoryContext, getSkillContext, getKnowledgeContext, addMemory, addEntry, enrichMessageWithContext, activeWindow, clearFiles, parseActions, speechSettings.continuousConversation, scheduleListenAgain]
+    [sendMessage, speak, autoSpeak, user, fileContext.isLoaded, getFileContextMessage, getMemoryContext, getSkillContext, getKnowledgeContext, addMemory, addEntry, enrichMessageWithContext, activeWindow, clearFiles, parseActions, speechSettings.continuousConversation, scheduleListenAgain, enqueueWaitingMessage]
   );
 
   const createNewChat = useCallback(() => {
@@ -835,6 +856,13 @@ ${getAdminContext()}` : ""}`,
     },
     [handleSend, recordOutgoingMessage]
   );
+
+  useEffect(() => {
+    if (isLoading || sendingRef.current || waitingMessages.length === 0) return;
+    const [nextMessage] = waitingMessages;
+    setWaitingMessages((current) => current.slice(1));
+    void handleSend(nextMessage.text, nextMessage.aiMode, nextMessage.selectedConnectorIds);
+  }, [handleSend, isLoading, waitingMessages]);
 
   const deleteConversation = useCallback((id: string) => {
     setConversations((prev) => prev.filter((c) => c.id !== id));
@@ -943,6 +971,7 @@ ${getAdminContext()}` : ""}`,
           messages={messages}
           isLoading={isLoading}
           handleSend={handleSendTracked}
+          waitingCount={waitingMessages.length}
           voiceState={voiceState}
           transcript={transcript}
           isVoiceSupported={isVoiceSupported}
@@ -976,6 +1005,7 @@ ${getAdminContext()}` : ""}`,
           messages={messages}
           isLoading={isLoading}
           handleSend={handleSendTracked}
+          waitingCount={waitingMessages.length}
           voiceState={voiceState}
           transcript={transcript}
           isVoiceSupported={isVoiceSupported}
@@ -1175,6 +1205,7 @@ ${getAdminContext()}` : ""}`,
             <CommandBar
               onSend={handleSendTracked}
               isLoading={isLoading}
+              waitingCount={waitingMessages.length}
               isVoiceSupported={isVoiceSupported}
               onStartVoice={handleStartVoice}
               onStopVoice={stopListening}

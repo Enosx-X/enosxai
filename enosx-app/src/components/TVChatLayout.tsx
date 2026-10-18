@@ -14,6 +14,7 @@ interface TVChatLayoutProps {
   messages: Message[];
   isLoading: boolean;
   handleSend: (text: string, aiMode?: AIMode) => void;
+  waitingCount?: number;
   voiceState: VoiceState;
   transcript: string;
   isVoiceSupported: boolean;
@@ -36,6 +37,7 @@ export default function TVChatLayout({
   messages,
   isLoading,
   handleSend,
+  waitingCount = 0,
   voiceState,
   transcript,
   isVoiceSupported,
@@ -164,6 +166,7 @@ export default function TVChatLayout({
         <CommandBar
           onSend={handleSend}
           isLoading={isLoading}
+          waitingCount={waitingCount}
           voiceState={voiceState}
           transcript={transcript}
           isVoiceSupported={isVoiceSupported}

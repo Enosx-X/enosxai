@@ -10,7 +10,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowUp, Mic, MicOff, Square, Loader2, ChevronDown, Paperclip, ListChecks, Languages, Code2, Sparkles } from "lucide-react";
+import { ArrowUp, Mic, MicOff, Square, Clock3, ChevronDown, Paperclip, ListChecks, Languages, Code2, Sparkles } from "lucide-react";
 import { VoiceState, type Attachment } from "@/lib/types";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useWallpaper } from "@/contexts/WallpaperContext";
@@ -76,6 +76,7 @@ interface CommandBarProps {
   isFreeMode?: boolean;
   onFilesSelected?: (files: File[]) => void;
   attachments?: Attachment[];
+  waitingCount?: number;
 }
 
 export default function CommandBar({
@@ -92,6 +93,7 @@ export default function CommandBar({
   isFreeMode = false,
   onFilesSelected,
   attachments = [],
+  waitingCount = 0,
 }: CommandBarProps) {
   const { config } = useTheme();
   const { settings: wallpaperSettings } = useWallpaper();
@@ -151,7 +153,7 @@ export default function CommandBar({
 
   const handleSend = useCallback(() => {
     const text = value.trim();
-    if (!text || disabled || isLoading) return;
+    if (!text || disabled) return;
     onSend(text, aiMode, selectedConnectorIds);
     setValue("");
     if (textareaRef.current) {
@@ -190,7 +192,7 @@ export default function CommandBar({
     }
   };
 
-  const canSend = value.trim().length > 0 && !disabled && !isLoading;
+  const canSend = value.trim().length > 0 && !disabled;
 
   return (
     <>
@@ -198,6 +200,12 @@ export default function CommandBar({
 
       {/* ── Main command bar ── */}
       <div className="px-4 pb-2 pt-1 flex-shrink-0">
+        {waitingCount > 0 && (
+          <div className="mx-auto mb-2 flex max-w-3xl items-center gap-2 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.06] px-3 py-2 text-[11px] text-cyan-100/75" role="status">
+            <Clock3 size={13} className="shrink-0 text-cyan-300" />
+            <span>{waitingCount} waiting message{waitingCount === 1 ? "" : "s"} queued — ENOSX AI will handle them in order.</span>
+          </div>
+        )}
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -491,15 +499,10 @@ export default function CommandBar({
                           cursor: "not-allowed",
                         }
                   }
-                  title="Send"
+                  title={isLoading ? "Add to waiting list" : "Send"}
                 >
                   {isLoading ? (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    >
-                      <Loader2 size={16} />
-                    </motion.div>
+                    <Clock3 size={16} />
                   ) : (
                     <ArrowUp size={16} strokeWidth={2.5} />
                   )}
