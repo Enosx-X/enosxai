@@ -7,6 +7,20 @@ export interface FileContext {
   isLoaded: boolean;
 }
 
+function mimeTypeFor(file: File, extension: string) {
+  if (file.type) return file.type;
+  const knownTypes: Record<string, string> = {
+    avif: "image/avif",
+    bmp: "image/bmp",
+    gif: "image/gif",
+    jpeg: "image/jpeg",
+    jpg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+  };
+  return knownTypes[extension.toLowerCase()] || undefined;
+}
+
 export function useFileContext() {
   const [fileContext, setFileContext] = useState<FileContext>({
     files: [],
@@ -22,7 +36,7 @@ export function useFileContext() {
         id: nanoid(),
         name: file.name,
         type: ext,
-        mimeType: file.type || undefined,
+        mimeType: mimeTypeFor(file, ext),
         size: file.size,
         content,
         analysisContent: analysis?.analysisContent,

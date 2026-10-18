@@ -515,7 +515,10 @@ export default function ChatPage() {
       }
       // In-flight guard: ignore overlapping calls so a prompt is added exactly
       // once per user action.
-      if (sendingRef.current) return "";
+      if (sendingRef.current) {
+        enqueueWaitingMessage(text, aiMode, selectedConnectorIds);
+        return "Queued for the next available task slot.";
+      }
       sendingRef.current = true;
       try {
       // A short "Enosx" greeting opens guided setup instead of sending a
@@ -523,10 +526,6 @@ export default function ChatPage() {
       if (/^enosx(?:\s+ai)?[.!?]*$/i.test(text.trim())) {
         setShowEnosxOnboarding(true);
         return "";
-      }
-      if (sendingRef.current) {
-        enqueueWaitingMessage(text, aiMode, selectedConnectorIds);
-        return "Queued for the next available task slot.";
       }
       if (aiMode) setActiveMode(aiMode);
       // Do not keep showing an old image-generation failure after the user

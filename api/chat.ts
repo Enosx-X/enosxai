@@ -207,7 +207,8 @@ function shapeMessages(messages: any[]) {
       if (remainingVisuals <= 0) break;
       const mime = String(attachment.mimeType || "").toLowerCase();
       const selected = { image: false, frames: [] as string[] };
-      if (mime.startsWith("image/") && typeof attachment.content === "string" && attachment.content.startsWith("data:image/")) {
+      if ((mime.startsWith("image/") || /\.(?:avif|bmp|gif|jpe?g|png|webp)$/i.test(String(attachment.name || attachment.type || "")))
+        && typeof attachment.content === "string" && attachment.content.startsWith("data:image/")) {
         selected.image = true;
         remainingVisuals -= 1;
       }
