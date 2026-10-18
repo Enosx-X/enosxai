@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Copy, Volume2, VolumeX, Check, Download, ExternalLink, FileSearch, ListTree, ShieldCheck, FileText, FileSpreadsheet } from "lucide-react";
+import { Copy, Volume2, VolumeX, Check, Download, ExternalLink, FileSearch, ListTree, ShieldCheck, FileText, FileSpreadsheet, ThumbsUp, ThumbsDown } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { Message } from "@/lib/types";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -17,6 +17,7 @@ import ImageDisplay from "./ImageDisplay";
 import VideoDisplay from "./VideoDisplay";
 import MediaAttachmentList from "./MediaAttachmentList";
 import { downloadDocument } from "@/lib/documentExport";
+import { getMessageFeedback, submitMessageFeedback, type MessageFeedback, type MessageFeedbackRating } from "@/lib/feedback";
 
 interface MessageBubbleProps {
   message: Message;
@@ -228,6 +229,10 @@ export default function MessageBubble({
   const [copied, setCopied] = useState(false);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [feedback, setFeedback] = useState<MessageFeedback | null>(() => getMessageFeedback(message.id));
+  const [feedbackNote, setFeedbackNote] = useState("");
+  const [feedbackNoteOpen, setFeedbackNoteOpen] = useState(false);
+  const [feedbackNoteSent, setFeedbackNoteSent] = useState(false);
   const isUser = message.role === "user";
   const isStreaming = message.isStreaming;
   const isEmpty = !message.content?.trim() && isStreaming;
@@ -239,6 +244,20 @@ export default function MessageBubble({
     await navigator.clipboard.writeText(message.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleFeedback = (rating: MessageFeedbackRating) => {
+    setFeedback(submitMessageFeedback(message.id, rating));
+    setFeedbackNoteSent(false);
+    setFeedbackNoteOpen(rating === "down");
+  };
+
+  const handleFeedbackNoteSubmit = () => {
+    const note = feedbackNote.trim();
+    setFeedbackNoteOpen(false);
+    if (!note) return;
+    setFeedback(submitMessageFeedback(message.id, feedback?.rating ?? "down", { note }));
+    setFeedbackNoteSent(true);
   };
 
   const handleDownload = async (format: 'md' | 'pdf' | 'docx' | 'xlsx') => {
@@ -420,6 +439,7 @@ export default function MessageBubble({
 
         {/* Action buttons */}
         {!isStreaming && message.content && (
+          <>
           <motion.div
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
@@ -443,6 +463,38 @@ export default function MessageBubble({
 
             {!isUser && (
               <>
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => handleFeedback("up")}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-150"
+                  style={{
+                    background: feedback?.rating === "up" ? `rgba(${config.accentRgb}, 0.14)` : "rgba(255,255,255,0.04)",
+                    border: feedback?.rating === "up" ? `1px solid rgba(${config.accentRgb}, 0.3)` : "1px solid rgba(255,255,255,0.07)",
+                    color: feedback?.rating === "up" ? config.accent : config.textMuted,
+                  }}
+                  title="Helpful response"
+                  aria-label="Mark response as helpful"
+                >
+                  <ThumbsUp size={12} />
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => handleFeedback("down")}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-150"
+                  style={{
+                    background: feedback?.rating === "down" ? "rgba(248, 113, 113, 0.14)" : "rgba(255,255,255,0.04)",
+                    border: feedback?.rating === "down" ? "1px solid rgba(248, 113, 113, 0.35)" : "1px solid rgba(255,255,255,0.07)",
+                    color: feedback?.rating === "down" ? "#fca5a5" : config.textMuted,
+                  }}
+                  title="Needs improvement"
+                  aria-label="Mark response as needing improvement"
+                >
+                  <ThumbsDown size={12} />
+                </motion.button>
+
                 <motion.button
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
@@ -500,6 +552,30 @@ export default function MessageBubble({
               })}
             </span>
           </motion.div>
+          {!isUser && feedbackNoteOpen && (
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <input
+                value={feedbackNote}
+                onChange={(event) => setFeedbackNote(event.target.value)}
+                onKeyDown={(event) => { if (event.key === "Enter") handleFeedbackNoteSubmit(); }}
+                placeholder="What should be better? (optional)"
+                aria-label="Feedback note"
+                className="h-7 w-60 max-w-full rounded-lg border border-white/10 bg-black/30 px-2 text-[11px] outline-none placeholder:text-white/35"
+                style={{ color: config.text }}
+              />
+              <button
+                type="button"
+                onClick={handleFeedbackNoteSubmit}
+                className="h-7 rounded-lg border border-white/10 bg-white/5 px-2.5 text-[11px] text-white/80 transition-colors hover:bg-white/10"
+              >
+                Send
+              </button>
+            </div>
+          )}
+          {!isUser && feedbackNoteSent && (
+            <p className="mt-0.5 text-[10px]" style={{ color: config.textMuted }}>Thanks — your note was sent to the Enosx team.</p>
+          )}
+          </>
         )}
       </div>
     </motion.div>

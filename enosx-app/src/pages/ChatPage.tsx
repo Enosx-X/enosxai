@@ -399,7 +399,10 @@ export default function ChatPage() {
   const { activeWindow } = useActiveWindow();
   const { enrichMessageWithContext } = useContextAwareMessages();
   const { fileContext, getFileContextMessage, clearFiles, loadFile, removeFile } = useFileContext();
-  const { getMemoryContext, addMemory } = useMemoryBank();
+  // Signed-in accounts sync their memory bank across sessions and devices.
+  const { getMemoryContext, addMemory } = useMemoryBank({
+    ownerId: user && user.provider !== "guest" ? user.id : undefined,
+  });
   const { getSkillContext, getKnowledgeContext, addEntry } = useKnowledgeBank();
   const { parseActions } = useSystemActions();
   const enqueueWaitingMessage = useCallback((text: string, aiMode?: AIMode, selectedConnectorIds?: string[]) => {

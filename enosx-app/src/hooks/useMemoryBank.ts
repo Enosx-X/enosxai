@@ -2,9 +2,11 @@
  * ENOSX AI — useMemoryBank
  * Manages persistent long-term memory for the AI.
  * Memory is device-owned and is ranked per request so unrelated memories do not
- * crowd the model context window.
+ * crowd the model context window. Signed-in accounts also sync user memories
+ * to Firestore so recall survives across sessions and devices.
  */
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { loadMemoryBank, saveMemoryBank, type StoredMemoryEntry } from "@/lib/firebaseStorage";
 
 export interface MemoryEntry {
   id: string;
@@ -14,9 +16,15 @@ export interface MemoryEntry {
   metadata?: Record<string, any>;
 }
 
+export interface UseMemoryBankOptions {
+  /** Firebase uid of the signed-in owner, or undefined for guest sessions. */
+  ownerId?: string;
+}
+
 const STORAGE_KEY = "enosx_memory_bank";
 const MAX_CONTEXT_CHARS = 9000;
 const MAX_USER_MEMORIES = 14;
+const SYNC_DEBOUNCE_MS = 900;
 
 function loadStoredMemories(): MemoryEntry[] {
   try {
@@ -39,8 +47,33 @@ function scoreMemory(memory: MemoryEntry, queryTokens: Set<string>) {
   return overlap / queryTokens.size + recency;
 }
 
-export function useMemoryBank() {
+const SYNCABLE_CATEGORIES = ["preference", "project", "fact", "instruction", "skill", "agent"];
+
+function normalizeStoredMemory(value: unknown): MemoryEntry | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const category = typeof record.category === "string" ? record.category : "";
+  if (!SYNCABLE_CATEGORIES.includes(category)) return null;
+  const content = typeof record.content === "string" ? record.content.trim() : "";
+  if (!content || content.length > 4_000) return null;
+  const parsedTimestamp = record.timestamp ? new Date(String(record.timestamp)) : new Date();
+  return {
+    id: typeof record.id === "string" && record.id ? record.id : crypto.randomUUID?.() || Math.random().toString(36).slice(2, 11),
+    category: category as MemoryEntry["category"],
+    content,
+    timestamp: Number.isNaN(parsedTimestamp.getTime()) ? new Date() : parsedTimestamp,
+    metadata: record.metadata && typeof record.metadata === "object" ? (record.metadata as Record<string, any>) : undefined,
+  };
+}
+
+function memoryKey(memory: MemoryEntry) {
+  return memory.content.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export function useMemoryBank(options: UseMemoryBankOptions = {}) {
+  const { ownerId } = options;
   const [memories, setMemories] = useState<MemoryEntry[]>(loadStoredMemories);
+  const remoteSaveTimer = useRef<number | null>(null);
 
   const systemMemories = useMemo<MemoryEntry[]>(() => [
     { id: "sys-1", category: "system", content: "I am ENOSX AI, an intelligent workspace developed by Enosx Technologies. Enosx Technologies was founded in Nairobi, Kenya in 2024 by Enosh Yeswa, its Founder and Chief Executive Officer. Our mission is to make software feel instant through multimodal AI assistants, commerce experiences, and coaching products.", timestamp: new Date() },
@@ -58,11 +91,60 @@ export function useMemoryBank() {
     return () => { window.removeEventListener("storage", refresh); window.removeEventListener("enosx:memory-updated", refresh); };
   }, []);
 
+  const scheduleRemoteSave = useCallback((entries: MemoryEntry[]) => {
+    if (!ownerId || typeof window === "undefined") return;
+    if (remoteSaveTimer.current) window.clearTimeout(remoteSaveTimer.current);
+    remoteSaveTimer.current = window.setTimeout(() => {
+      const syncable = entries
+        .filter((entry) => entry.category !== "system")
+        .map<StoredMemoryEntry>((entry) => ({
+          id: entry.id,
+          category: entry.category,
+          content: entry.content,
+          timestamp: entry.timestamp.toISOString(),
+          metadata: entry.metadata,
+        }));
+      void saveMemoryBank(ownerId, syncable).catch((error) => {
+        console.error("[useMemoryBank] Failed to sync the memory bank:", error);
+      });
+    }, SYNC_DEBOUNCE_MS);
+  }, [ownerId]);
+
+  useEffect(() => () => {
+    if (remoteSaveTimer.current) window.clearTimeout(remoteSaveTimer.current);
+  }, []);
+
+  // Merge the signed-in account's synced bank with this device's local bank.
+  // Entries are de-duplicated by content; the newest copy wins.
+  useEffect(() => {
+    if (!ownerId) return;
+    let cancelled = false;
+    void loadMemoryBank(ownerId).then((stored) => {
+      if (cancelled) return;
+      const remoteEntries = stored.map(normalizeStoredMemory).filter((entry): entry is MemoryEntry => Boolean(entry));
+      const local = loadStoredMemories();
+      const byContent = new Map<string, MemoryEntry>();
+      for (const entry of [...remoteEntries, ...local]) {
+        const key = memoryKey(entry);
+        const existing = byContent.get(key);
+        if (!existing || entry.timestamp.getTime() > existing.timestamp.getTime()) byContent.set(key, entry);
+      }
+      const merged = Array.from(byContent.values()).sort((left, right) => right.timestamp.getTime() - left.timestamp.getTime());
+      setMemories(merged);
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch { /* local persistence is best-effort */ }
+      if (merged.length !== local.length) scheduleRemoteSave(merged);
+    }).catch((error) => {
+      console.error("[useMemoryBank] Failed to load the synced memory bank:", error);
+    });
+    return () => { cancelled = true; };
+  }, [ownerId, scheduleRemoteSave]);
+
   const commitMemories = useCallback((next: MemoryEntry[]) => {
     setMemories(next);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     window.dispatchEvent(new CustomEvent("enosx:memory-updated"));
-  }, []);
+    scheduleRemoteSave(next);
+  }, [scheduleRemoteSave]);
 
   const addMemory = useCallback((category: MemoryEntry["category"], content: string, metadata?: Record<string, any>) => {
     const normalized = content.trim();

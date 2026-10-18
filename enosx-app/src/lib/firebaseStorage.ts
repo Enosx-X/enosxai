@@ -118,3 +118,38 @@ export async function deleteConversation(uid: string, chatId: string) {
   }
   await deleteDoc(doc(db, "users", uid, "chats", chatId));
 }
+
+// ── Long-term memory bank (cross-session recall) ─────────────────────────────
+// The memory bank is stored as a bounded field on the user's profile document
+// so the existing /users/{userId} security rules already protect it. System
+// memories are rebuilt in code and are never synced.
+export interface StoredMemoryEntry {
+  id: string;
+  category: string;
+  content: string;
+  timestamp: string;
+  metadata?: Record<string, unknown>;
+}
+
+const MAX_SYNCED_MEMORIES = 100;
+
+export async function saveMemoryBank(uid: string, memories: StoredMemoryEntry[]) {
+  const { db } = requireFirebase();
+  await setDoc(
+    doc(db, "users", uid),
+    {
+      memoryBank: clean(memories.slice(0, MAX_SYNCED_MEMORIES)),
+      memoryBankUpdatedAt: new Date().toISOString(),
+      serverMemoryBankUpdatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
+
+export async function loadMemoryBank(uid: string): Promise<StoredMemoryEntry[]> {
+  const { db } = requireFirebase();
+  const snapshot = await getDoc(doc(db, "users", uid));
+  if (!snapshot.exists()) return [];
+  const data = snapshot.data();
+  return Array.isArray(data?.memoryBank) ? (data.memoryBank as StoredMemoryEntry[]) : [];
+}

@@ -7,6 +7,7 @@
  *   - NVIDIA_EX_*_MODEL and NVIDIA_EX_*_VISION_MODEL (optional per-mode overrides)
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { evaluateSafetyGuard } from "../lib/server/safetyGuard";
 
 // NOTE: maxDuration intentionally omitted. An explicit per-function override can
 // conflict with the project-wide Vercel runtime configuration and cause
@@ -72,6 +73,18 @@ Response quality protocol:
 - For plans, provide ordered steps, dependencies, success criteria, and the highest-impact risks.
 - Separate verified facts, estimates, and recommendations. Never claim a source, tool, connector, memory, or completed action that was not actually provided.
 
+Domain knowledge modules:
+- Finance and markets: cover personal finance, accounting, valuation, corporate finance, economics, and market analysis with explicit assumptions and simple, reproducible math. Cite primary or official sources when a figure, rule, or filing matters (for example SEC EDGAR filings, FRED, IMF, World Bank, or central-bank publications) and include the reporting period and currency. Label scenarios, estimates, and forward-looking statements clearly. This is educational analysis, not investment, tax, or legal advice; recommend a licensed professional for decisions involving real money, and never guarantee returns.
+- Law and compliance: cover legal concepts, procedures, contract reading, and regulatory questions with attention to jurisdiction, effective dates, and whether the rule is settled or contested. Prefer official primary sources (official gazettes, legislative portals, EUR-Lex, US Code and CFR via govinfo, Kenya Law) over secondary summaries, and say when you are uncertain or when local counsel is required. This is general information, not legal advice; recommend a qualified lawyer for binding interpretations or filings.
+- Medicine and health: cover anatomy, physiology, first aid, medications, and public-health questions at a level appropriate for education and self-care decisions. Prefer authoritative sources (WHO, CDC, NIH/PubMed, NICE, national health ministries) and state guideline recency. Screen for red-flag symptoms, encourage professional evaluation for diagnosis or treatment, and never replace emergency care: for emergencies direct the user to local emergency services immediately. This is general health information, not a diagnosis or prescription.
+- For these domains, state the module you are drawing on, cite the sources you actually used (name plus URL when available), and include a one-line scope disclaimer. Never invent a citation, case number, statute, study, price, or guideline.
+
+Fairness, bias, and human dignity:
+- Treat every person with equal respect regardless of race, ethnicity, nationality, tribe, religion, sex, gender, age, disability, health status, or economic situation. Never use or amplify stereotypes, slurs, or demeaning generalizations.
+- Present contested topics with the strongest relevant perspectives fairly, distinguish empirical findings from value judgments, and be transparent about uncertainty and the limits of your knowledge.
+- Follow the user's legitimate goal even when you disagree with their framing; answer the underlying question instead of moralizing, and refuse only what the ENOSX protocol requires.
+- When you notice a possible error or bias in your own answer, correct it plainly and continue.
+
 Current ENOSX AI product updates (September 2026):
 - ENOSX AI has three modes: EX Core, EX Pro, and ENOSH MIND. All modes are available without payment or a subscription.
 - EX Core chat is designed to remain available even when the optional database is not configured. If the user asks about missing DATABASE_URL, explain that remote account limits and cloud history may be unavailable while local chat remains usable; do not expose secrets or invent a connection string.
@@ -118,6 +131,80 @@ const MAX_MESSAGE_CHARS = 20_000;
 // overflow the model context window or inflate latency/cost.
 const MAX_HISTORY_CHARS = 120_000;
 const PROVIDER_RETRY_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
+
+// --- Response cache -------------------------------------------------------
+// Identical requests (same mode, model, system context, and message history)
+// are answered from an instance-local cache until it expires. This keeps
+// repeated common queries (greetings, identity questions, re-sent prompts)
+// instant and avoids paying provider latency twice. Vision requests are never
+// cached because their payload is large and usually unique.
+const RESPONSE_CACHE_TTL_MS = 10 * 60 * 1_000;
+const RESPONSE_CACHE_MAX_ENTRIES = 64;
+const responseCache = new Map<string, { text: string; createdAt: number }>();
+
+function hashRequestKey(value: string) {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16);
+}
+
+function readCachedResponse(key: string) {
+  const entry = responseCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.createdAt > RESPONSE_CACHE_TTL_MS) {
+    responseCache.delete(key);
+    return null;
+  }
+  return entry.text;
+}
+
+function writeCachedResponse(key: string, text: string) {
+  const now = Date.now();
+  for (const [existingKey, entry] of responseCache) {
+    if (now - entry.createdAt > RESPONSE_CACHE_TTL_MS) responseCache.delete(existingKey);
+  }
+  while (responseCache.size >= RESPONSE_CACHE_MAX_ENTRIES) {
+    const oldestKey = responseCache.keys().next().value;
+    if (typeof oldestKey !== "string") break;
+    responseCache.delete(oldestKey);
+  }
+  responseCache.set(key, { text, createdAt: now });
+}
+
+// Concurrent duplicate requests share one provider call. The first request
+// ("owner") streams from the provider and records the assembled answer; any
+// request that arrives while it is still running waits for that answer and
+// replays it instead of starting a second identical provider call.
+const pendingChatRequests = new Map<string, Promise<string | null>>();
+
+function assembleStreamedText(state: { text: string; remainder: string; failed: boolean }, chunk: string) {
+  state.remainder += chunk;
+  const lines = state.remainder.split("\n");
+  state.remainder = lines.pop() ?? "";
+  for (const line of lines) {
+    if (!line.startsWith("data: ")) continue;
+    const data = line.slice(6).trim();
+    if (!data || data === "[DONE]") continue;
+    try {
+      const parsed = JSON.parse(data);
+      if (parsed?.error) {
+        state.failed = true;
+        continue;
+      }
+      const delta = parsed?.choices?.[0]?.delta?.content;
+      if (typeof delta === "string") state.text += delta;
+    } catch {
+      // Partial JSON across chunk boundaries is ignored; the next chunk completes it.
+    }
+  }
+}
+
+// --- Safety guard ---------------------------------------------------------
+// Deterministic server-side protections for the highest-risk categories are
+// shared with the Express backend through lib/server/safetyGuard.
 
 async function fetchNvidiaWithRetry(url: string, apiKey: string, body: unknown) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -304,6 +391,10 @@ const sendMockResponse = (res: VercelResponse, message: string) => {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const requestStartedAt = Date.now();
+  let pendingCacheKey = "";
+  let resolvePending: ((value: string | null) => void) | null = null;
+
   // Set CORS headers
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -351,6 +442,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: "Messages array is required and must not be empty" });
     }
     const ctxStr = typeof githubContext === "string" ? githubContext.slice(0, 20000) : "";
+
+    // Deterministic safety guard. Only the newest user turn is inspected so
+    // historical, educational, or professional discussion is not misclassified.
+    const lastUserMessage = [...messages].reverse().find((message: any) => message?.role === "user");
+    const lastUserText = typeof lastUserMessage?.content === "string"
+      ? lastUserMessage.content
+      : Array.isArray(lastUserMessage?.content)
+        ? lastUserMessage.content.map((part: any) => (part?.type === "text" && typeof part.text === "string" ? part.text : "")).join(" ")
+        : "";
+    const guardedResponse = evaluateSafetyGuard(lastUserText);
+    if (guardedResponse) {
+      console.log("[API] Safety guard served a protected response:", guardedResponse.category);
+      return sendMockResponse(res, guardedResponse.response);
+    }
 
     // Keep the public mode contract aligned with the three-tier selector.
     const modeNotes: Record<string, string> = {
@@ -410,6 +515,37 @@ You are running in ENOSH MIND (highest intelligence) mode. Operate as a rigorous
     const model = hasImages ? modeModels.vision : modeModels.text;
     const nvidiaApiUrl = `${(process.env.NVIDIA_API_BASE_URL || "https://integrate.api.nvidia.com/v1").replace(/\/$/, "")}/chat/completions`;
 
+    // Serve identical non-visual requests from cache, or join an identical
+    // request that is already in flight, before touching the provider.
+    const cacheKey = hasImages ? "" : hashRequestKey(`${model}|${JSON.stringify(chatMessages)}`);
+    if (cacheKey) {
+      const cachedResponse = readCachedResponse(cacheKey);
+      if (cachedResponse) {
+        console.log("[API] Cache hit; served identical request in", Date.now() - requestStartedAt, "ms.");
+        res.setHeader("X-Enosx-Cache", "hit");
+        return sendMockResponse(res, cachedResponse);
+      }
+      const pendingRequest = pendingChatRequests.get(cacheKey);
+      if (pendingRequest) {
+        console.log("[API] Joining an identical request that is already in flight.");
+        res.setHeader("X-Enosx-Cache", "shared");
+        const sharedResponse = await pendingRequest;
+        if (sharedResponse) return sendMockResponse(res, sharedResponse);
+        return res.status(503).json({
+          error: "The AI service is temporarily unavailable. Please try again in a moment.",
+          code: "PROVIDER_UNAVAILABLE",
+        });
+      }
+      pendingCacheKey = cacheKey;
+      pendingChatRequests.set(cacheKey, new Promise<string | null>((resolve) => { resolvePending = resolve; }));
+    }
+
+    const finishPending = (value: string | null) => {
+      resolvePending?.(value);
+      resolvePending = null;
+      if (pendingCacheKey) pendingChatRequests.delete(pendingCacheKey);
+    };
+
     console.log("[API] Sending request to NVIDIA API with", chatMessages.length, "messages and model", model);
 
     const nvidiaResponse = await fetchNvidiaWithRetry(nvidiaApiUrl, apiKey, {
@@ -426,6 +562,7 @@ You are running in ENOSH MIND (highest intelligence) mode. Operate as a rigorous
     if (!nvidiaResponse.ok) {
       const errorText = await nvidiaResponse.text().catch(() => "Unknown error");
       console.error("[API] NVIDIA API error:", nvidiaResponse.status, errorText);
+      finishPending(null);
       return res.status(503).json({
         error: "The AI service is temporarily unavailable. Please try again in a moment.",
         code: "PROVIDER_UNAVAILABLE",
@@ -438,16 +575,29 @@ You are running in ENOSH MIND (highest intelligence) mode. Operate as a rigorous
       res.setHeader("Connection", "keep-alive");
       const reader = nvidiaResponse.body.getReader();
       const decoder = new TextDecoder();
+      const captured = { text: "", remainder: "", failed: false };
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          res.write(decoder.decode(value, { stream: true }));
+          const chunk = decoder.decode(value, { stream: true });
+          res.write(chunk);
+          if (cacheKey) assembleStreamedText(captured, chunk);
         }
       } catch (streamError) {
         console.error("[API] NVIDIA stream timed out or failed:", streamError);
         res.write(`data: ${JSON.stringify({ error: { message: "The NVIDIA response timed out. Please try again." } })}\n\ndata: [DONE]\n\n`);
+        finishPending(null);
+        res.end();
+        return;
       }
+      if (cacheKey && !captured.failed && captured.text.trim()) {
+        writeCachedResponse(cacheKey, captured.text);
+        finishPending(captured.text);
+      } else {
+        finishPending(null);
+      }
+      console.log("[API] Streamed response in", Date.now() - requestStartedAt, "ms; cached:", Boolean(cacheKey && !captured.failed && captured.text.trim()));
       res.end();
       return;
     }
@@ -457,20 +607,27 @@ You are running in ENOSH MIND (highest intelligence) mode. Operate as a rigorous
       responseData = await nvidiaResponse.json();
     } catch (parseError) {
       console.error("[API] Invalid JSON response from NVIDIA API:", parseError);
+      finishPending(null);
       return res.status(502).json({ error: "The AI service returned an invalid response. Please try again.", code: "INVALID_PROVIDER_RESPONSE" });
     }
 
     const content = responseData?.choices?.[0]?.message?.content;
     if (typeof content !== "string" || content.length === 0) {
       console.error("[API] NVIDIA API response did not contain assistant content:", responseData);
+      finishPending(null);
       return res.status(502).json({ error: "No response received from the AI service. Please try again.", code: "EMPTY_PROVIDER_RESPONSE" });
     }
 
+    if (cacheKey) writeCachedResponse(cacheKey, content);
+    finishPending(content);
     return sendMockResponse(res, content);
   } catch (err) {
     console.error("[API] Unexpected error:", err);
-    const msg = err instanceof Error ? err.message : "Unknown error";
-    
+    // Release any identical request waiting on this one so it can fail fast.
+    resolvePending?.(null);
+    resolvePending = null;
+    if (pendingCacheKey) pendingChatRequests.delete(pendingCacheKey);
+
     // Send a helpful message instead of crashing
     return res.status(503).json({
       error: "The AI service is temporarily unavailable. Please try again shortly.",

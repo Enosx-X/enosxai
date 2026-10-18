@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { ENOSX_APP_VERSION } from "@/lib/appVersion";
 
 const recentReports = new Map<string, number>();
 const REPORT_DEDUPE_WINDOW_MS = 60_000;
@@ -28,7 +29,7 @@ export function reportClientError(error: unknown, source = "client", extraStack 
     stack,
     source: plainText(source, 80),
     path: plainText(window.location.pathname, 200),
-    appVersion: "0.1.24",
+    appVersion: ENOSX_APP_VERSION,
     userAgent: plainText(window.navigator.userAgent, 300),
     occurredAt: new Date(now).toISOString(),
   };

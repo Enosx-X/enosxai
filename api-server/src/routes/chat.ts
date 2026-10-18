@@ -1,4 +1,6 @@
 import { Router, Request, Response } from "express";
+import { fetchNvidiaWithRetry } from "../../../lib/server/retryFetch";
+import { evaluateSafetyGuard } from "../../../lib/server/safetyGuard";
 
 const chatRouter = Router();
 
@@ -110,6 +112,17 @@ Privacy Protocol:
 Tone:
 Respectful, loyal, tech-forward, and emotionally intelligent. Treat the founder with the same prestige as major tech leaders. Be professional yet approachable, innovative yet grounded.
 
+Domain knowledge modules:
+- Finance and markets: use explicit assumptions and reproducible math; cite official sources (SEC EDGAR, FRED, IMF, World Bank, central-bank publications) with periods and currency when a figure matters. Label estimates and scenarios; this is educational analysis, not investment, tax, or legal advice.
+- Law and compliance: note the jurisdiction, effective dates, and uncertainty. Prefer official primary sources (official gazettes, legislative portals, EUR-Lex, US Code/CFR via govinfo, Kenya Law). This is general information, not legal advice.
+- Medicine and health: prefer WHO, CDC, NIH/PubMed, NICE, and national health ministries; state guideline recency, screen for red-flag symptoms, and direct emergencies to local emergency services. This is general health information, not a diagnosis or prescription.
+- For these domains, say which module applies, cite only sources actually used, and add a one-line scope disclaimer. Never invent a citation, statute, case, study, or guideline.
+
+Fairness, bias, and human dignity:
+- Treat every person with equal respect regardless of race, ethnicity, nationality, tribe, religion, sex, gender, age, disability, health status, or economic situation. Never use or amplify stereotypes or demeaning generalizations.
+- Present contested topics fairly, distinguish empirical findings from value judgments, and be transparent about uncertainty.
+- Answer the user's underlying question instead of moralizing, and refuse only what the ENOSX protocol requires.
+
 Online media formatting:
 - When a public image URL is supplied in the conversation or provided context, show it with Markdown image syntax in the form ![short description](https://...). Preserve the exact URL.
 - For a public video URL, preserve the exact URL and put it on its own line or use a concise Markdown link. Direct video files and supported YouTube or Vimeo links can render inline.
@@ -159,6 +172,23 @@ chatRouter.post("/chat", async (req: Request, res: Response) => {
     const ctxStr = typeof githubContext === "string" ? githubContext.slice(0, 20000) : "";
     // Skill context is user-owned and bounded; it is treated as procedure guidance, not executable authority.
     const skillsStr = typeof skillContext === "string" ? skillContext.slice(0, 12000) : "";
+
+    // Deterministic safety guard shared with the Vercel backend. Only the
+    // newest user turn is inspected so history is not misclassified.
+    const lastUserMessage = [...messages].reverse().find((message: any) => message?.role === "user");
+    const lastUserText = typeof lastUserMessage?.content === "string"
+      ? lastUserMessage.content
+      : Array.isArray(lastUserMessage?.content)
+        ? lastUserMessage.content.map((part: any) => (part?.type === "text" && typeof part.text === "string" ? part.text : "")).join(" ")
+        : "";
+    const guarded = evaluateSafetyGuard(lastUserText);
+    if (guarded) {
+      res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache, no-transform");
+      const data = JSON.stringify({ choices: [{ delta: { content: guarded.response } }] });
+      res.status(200).send(`data: ${data}\n\ndata: [DONE]\n\n`);
+      return;
+    }
 
     // Check for images to decide which model to use.
     let hasImages = false;
@@ -263,7 +293,11 @@ You are running in ENOSH MIND (highest intelligence) mode. Operate as a rigorous
     const model = hasImages ? modeModels.vision : modeModels.text;
 
     const nvidiaApiUrl = `${(process.env.NVIDIA_API_BASE_URL || "https://integrate.api.nvidia.com/v1").replace(/\/$/, "")}/chat/completions`;
-    const response = await fetch(nvidiaApiUrl, {
+    // Keep the same tiering as the Vercel backend: faster, shorter answers in
+    // EX Core and deeper reasoning with a larger budget in the higher modes.
+    // The shared retry helper adds a per-attempt timeout and transient retries
+    // so a stalled provider call can no longer hang the request.
+    const response = await fetchNvidiaWithRetry(nvidiaApiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -273,9 +307,9 @@ You are running in ENOSH MIND (highest intelligence) mode. Operate as a rigorous
         model,
         messages: finalMessages,
         stream: true,
-        max_tokens: 1024,
+        max_tokens: aiMode === "enosh-mind" ? 4096 : aiMode === "ex-pro" ? 3072 : 2048,
         temperature: 0.7,
-        reasoning_effort: "low",
+        reasoning_effort: aiMode === "enosh-mind" ? "high" : aiMode === "ex-pro" ? "medium" : "low",
       }),
     });
 

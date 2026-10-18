@@ -1125,3 +1125,23 @@
 @keyframes story-scan { 0% { transform: translateY(0); opacity: 0; } 12% { opacity: 1; } 88% { opacity: .65; } 100% { transform: translateY(475px); opacity: 0; } }
 @media (max-width: 900px) { .visual-story-hero { grid-template-columns: 1fr; } .story-metric-cluster { max-width: 600px; } }
 @media (max-width: 700px) { .visual-story-page { padding: 18px 12px 34px; } .visual-story-header { align-items: flex-start; flex-direction: column; } .visual-story-workbench { grid-template-columns: 1fr; } .story-beat-rail { min-height: auto; } .story-beat-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; } .story-beat { min-height: 110px; padding: 10px 7px; } .story-beat-copy small { display: none; } .story-stage { min-height: 410px; padding: 18px 12px 16px; } .story-chart { height: 285px; } .story-stage-toolbar { align-items: flex-start; flex-direction: column; } .story-data-editor { flex-direction: column; } }
+
+/* Accessibility & cognitive load: honor the device's reduced-motion setting
+   and give keyboard users a clear, consistent focus ring on interactive
+   controls. Motion-sensitive users get a calmer, instant interface. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+:where(button, a, input, textarea, select, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid rgba(220, 20, 60, 0.65);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
