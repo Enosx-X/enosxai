@@ -1,3 +1,15 @@
+## v0.1.30 — Safety guard, domain expertise, feedback & faster replies
+
+- Added a shared safety guard to both chat services: crisis and self-harm messages receive immediate guidance with local emergency contacts, requests sexualizing minors are refused with child-protection pointers, and weapon/explosive synthesis requests are declined with safer alternatives. Education, history, and professional questions on these topics remain answerable.
+- Added domain knowledge modules for finance, law, and medicine plus a fairness and bias section, injected into the assistant's system prompt so answers follow each field's standards and state scope disclaimers.
+- Added response feedback: thumbs up/down with an optional improvement note in chat, stored on-device and relayed to ENOSX support through a new rate-limited feedback endpoint.
+- Added a code-review endpoint (`POST /api/code-review`) that reviews diffs with NVIDIA's code model and returns a structured findings report for developer workflows.
+- Made the hosted chat endpoint faster under load: a 10-minute response cache and in-flight request de-duplication for identical prompts, NVIDIA retry with timeout handling, and per-mode token budgets for enosh-mind, ex-pro, and ex-core.
+- Expanded multimodal analysis: audio files are decoded and summarized with segment loudness, and videos are sampled at six evenly spaced frames with timestamps and duration in the analysis context.
+- Memory bank entries now sync to signed-in accounts and merge across devices, while guests keep device-local storage.
+- Unified the app version into a single shared constant used by error reports and feedback, and strengthened CI: cached pnpm store, superseded-run cancellation, and typechecks for the Express API server and Vercel functions.
+- Added reduced-motion and focus-visible accessibility styles.
+
 ## v0.1.28 — Connector logo composer & richer self-awareness
 
 - Replaced the composer's "Connectors" text button with the connector logos themselves; selected connectors now stack like a page group, with a `+N` overflow when more than three are chosen.

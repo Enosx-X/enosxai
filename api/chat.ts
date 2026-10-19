@@ -393,7 +393,9 @@ const sendMockResponse = (res: VercelResponse, message: string) => {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const requestStartedAt = Date.now();
   let pendingCacheKey = "";
-  let resolvePending: ((value: string | null) => void) | null = null;
+  // Held in an object so TypeScript's narrowing does not collapse the type
+  // across the stream callbacks and the outer catch block.
+  const pendingResolver: { current: ((value: string | null) => void) | null } = { current: null };
 
   // Set CORS headers
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -537,12 +539,12 @@ You are running in ENOSH MIND (highest intelligence) mode. Operate as a rigorous
         });
       }
       pendingCacheKey = cacheKey;
-      pendingChatRequests.set(cacheKey, new Promise<string | null>((resolve) => { resolvePending = resolve; }));
+      pendingChatRequests.set(cacheKey, new Promise<string | null>((resolve) => { pendingResolver.current = resolve; }));
     }
 
     const finishPending = (value: string | null) => {
-      resolvePending?.(value);
-      resolvePending = null;
+      pendingResolver.current?.(value);
+      pendingResolver.current = null;
       if (pendingCacheKey) pendingChatRequests.delete(pendingCacheKey);
     };
 
@@ -624,8 +626,8 @@ You are running in ENOSH MIND (highest intelligence) mode. Operate as a rigorous
   } catch (err) {
     console.error("[API] Unexpected error:", err);
     // Release any identical request waiting on this one so it can fail fast.
-    resolvePending?.(null);
-    resolvePending = null;
+    pendingResolver.current?.(null);
+    pendingResolver.current = null;
     if (pendingCacheKey) pendingChatRequests.delete(pendingCacheKey);
 
     // Send a helpful message instead of crashing

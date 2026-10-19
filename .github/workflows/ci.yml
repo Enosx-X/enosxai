@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+# Cancel superseded runs on the same branch so the newest commit is the one
+# that reports status, keeping CI feedback fast and unambiguous.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -22,11 +28,27 @@ jobs:
         with:
           version: 9
 
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
       - name: Install dependencies
         run: pnpm install
 
       - name: Typecheck enosx-app
         run: pnpm --filter @workspace/enosx-app typecheck || pnpm --filter @enosx/app typecheck || pnpm -r typecheck
+      - name: Typecheck api-server
+        run: pnpm --filter @workspace/api-server typecheck
+      - name: Typecheck Vercel functions
+        run: pnpm exec tsc -p api/tsconfig.json --noEmit
       - name: Install Playwright Chromium
         run: pnpm --filter @workspace/enosx-app exec playwright install --with-deps chromium
       - name: Run UI regression suite

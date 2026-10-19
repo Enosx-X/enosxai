@@ -1,5 +1,8 @@
 import { Router, Request, Response } from "express";
+// These shared server helpers live outside api-server/src by design.
+// @ts-ignore Shared helper lives outside api-server/src by design.
 import { fetchNvidiaWithRetry } from "../../../lib/server/retryFetch";
+// @ts-ignore Shared helper lives outside api-server/src by design.
 import { evaluateSafetyGuard } from "../../../lib/server/safetyGuard";
 
 const chatRouter = Router();

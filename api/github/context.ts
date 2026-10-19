@@ -96,9 +96,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
       .join("\n\n---\n\n");
 
-    res.status(200).json({ repos: repoContexts, context });
+    return res.status(200).json({ repos: repoContexts, context });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown GitHub context error";
-    res.status(500).json({ error: msg });
+    return res.status(500).json({ error: msg });
   }
 }
